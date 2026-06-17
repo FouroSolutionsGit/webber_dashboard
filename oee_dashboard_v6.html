@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Filling Machine #1 — OEE Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;font-size:14px}
+body.dark{background:#0f172a;color:#e2e8f0}
+body.light{background:#f1f5f9;color:#0f172a}
+#hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;position:sticky;top:0;z-index:100}
+body.dark #hdr{background:#1e293b;border-bottom:1px solid #334155}
+body.light #hdr{background:#fff;border-bottom:1px solid #e2e8f0}
+.logo{display:flex;align-items:center;gap:10px}
+.dot{width:9px;height:9px;border-radius:50%;background:#22c55e}
+.ttl{font-weight:700;font-size:15px}
+.sub{font-size:12px;opacity:.5;margin-left:4px}
+.ctrls{display:flex;gap:8px}
+.btn{padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s}
+body.dark .btn{background:transparent;color:#94a3b8;border:1px solid #334155}
+body.light .btn{background:transparent;color:#64748b;border:1px solid #e2e8f0}
+.btn.on,.btn:hover{background:#3b82f6;color:#fff;border-color:#3b82f6}
+/* Date filter active state */
+.date-btn{padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;transition:all .15s;position:relative;border:1px solid transparent}
+body.dark .date-btn{background:transparent;color:#94a3b8;border-color:#334155}
+body.light .date-btn{background:transparent;color:#64748b;border-color:#e2e8f0}
+.date-btn:hover{color:#3b82f6;border-color:#3b82f6;background:rgba(59,130,246,.08)}
+.date-btn.active{background:#3b82f6;color:#fff !important;border-color:#3b82f6;font-weight:700;box-shadow:0 0 0 3px rgba(59,130,246,.3),0 2px 6px rgba(59,130,246,.4)}
+.date-btn.active::after{content:'▼';position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:9px;color:#3b82f6;line-height:1}
+.thm{font-size:17px;padding:4px 10px}
+#main{padding:20px 24px 60px;max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.card{border-radius:10px;padding:18px}
+body.dark .card{background:#1e293b;border:1px solid #334155}
+body.light .card{background:#fff;border:1px solid #e2e8f0}
+.sh{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.sb{width:3px;height:16px;background:#3b82f6;border-radius:2px;flex-shrink:0}
+.st{font-size:14px;font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:7px 10px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+td{padding:6px 10px}
+body.dark th{background:#0f172a;color:#64748b;border-bottom:1px solid #334155}
+body.light th{background:#f8fafc;color:#94a3b8;border-bottom:1px solid #e2e8f0}
+body.dark tr:nth-child(even) td{background:rgba(255,255,255,.03)}
+body.light tr:nth-child(even) td{background:#f8fafc}
+body.dark td{border-bottom:1px solid rgba(255,255,255,.05)}
+body.light td{border-bottom:1px solid #f1f5f9}
+tfoot td{font-weight:700;padding:7px 10px}
+body.dark tfoot td{background:#0f172a;border-top:2px solid #475569}
+body.light tfoot td{background:#f1f5f9;border-top:2px solid #cbd5e1}
+.kgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kcard{border-radius:8px;padding:12px 16px;text-align:center}
+body.dark .kcard{background:#0f172a;border:1px solid #334155}
+body.light .kcard{background:#f8fafc;border:1px solid #e2e8f0}
+.kl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin-bottom:4px}
+.kv{font-size:24px;font-weight:700}
+.leg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px;font-size:12px}
+.li{display:flex;align-items:center;gap:5px;opacity:.8}
+.ld{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+.gantt-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.glbl{font-size:11px;width:88px;text-align:right;flex-shrink:0;opacity:.6}
+.gtrack{flex:1;height:26px;border-radius:3px;position:relative;overflow:hidden}
+body.dark .gtrack{background:#0f172a}
+body.light .gtrack{background:#e2e8f0}
+.gseg{height:100%;position:absolute;top:0;cursor:pointer}
+.gseg:hover{filter:brightness(1.15)}
+.gantt-block{margin-bottom:14px}
+.speed-row{display:flex;align-items:center;gap:8px;margin-top:2px;margin-bottom:2px}
+.speed-lbl{font-size:10px;width:88px;text-align:right;flex-shrink:0;opacity:.4;font-style:italic}
+.speed-canvas-wrap{flex:1;height:36px;position:relative;}
+.tooltip{position:fixed;background:#1e293b;border:1px solid #475569;color:#e2e8f0;border-radius:6px;padding:7px 11px;font-size:12px;pointer-events:none;z-index:9999;line-height:1.6;display:none}
+.warn{padding:8px 14px;border-radius:6px;font-size:12px;margin-bottom:10px}
+body.dark .warn{background:#1c1200;border:1px solid #854f0b;color:#fbbf24}
+body.light .warn{background:#fffbeb;border:1px solid #fcd34d;color:#92400e}
+.dates{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+.dlbl{font-size:12px;opacity:.5}
+.scroll{overflow-x:auto}
+.nodata{text-align:center;padding:14px;font-style:italic;opacity:.5}
+/* Gantt edit popup */
+#seg-popup{position:fixed;z-index:2000;border-radius:10px;padding:14px 16px;min-width:220px;
+  box-shadow:0 8px 32px rgba(0,0,0,.45);display:none;font-size:13px}
+body.dark #seg-popup{background:#1e293b;border:1px solid #475569;color:#e2e8f0}
+body.light #seg-popup{background:#fff;border:1px solid #cbd5e1;color:#0f172a}
+.popup-title{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin-bottom:10px}
+.popup-section{font-size:11px;opacity:.5;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.05em}
+.popup-btn{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border-radius:6px;
+  cursor:pointer;font-size:13px;font-family:inherit;border:none;text-align:left;transition:background .15s;margin-bottom:3px}
+body.dark .popup-btn{background:transparent;color:#e2e8f0}
+body.light .popup-btn{background:transparent;color:#0f172a}
+body.dark .popup-btn:hover{background:#334155}
+body.light .popup-btn:hover{background:#f1f5f9}
+.popup-btn .dot{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+.popup-divider{border:none;border-top:1px solid rgba(148,163,184,.2);margin:8px 0}
+.popup-close{float:right;opacity:.4;cursor:pointer;font-size:15px;line-height:1;margin-top:-2px}
+.popup-close:hover{opacity:.8}
+.split-wrap{display:flex;align-items:center;gap:6px;margin-top:4px}
+.split-input{flex:1;background:transparent;border:1px solid rgba(148,163,184,.3);border-radius:5px;
+  color:inherit;font-size:13px;font-family:inherit;padding:5px 8px;outline:none;width:70px}
+body.dark .split-input{background:#0f172a}
+body.light .split-input{background:#f8fafc}
+.split-input:focus{border-color:#3b82f6}
+.gseg.editable{cursor:pointer}
+.gseg.editable:hover{filter:brightness(1.2);outline:2px solid rgba(255,255,255,.4);outline-offset:-1px}
+.bd-note{width:100%;background:transparent;border:none;border-bottom:1px dashed rgba(148,163,184,.3);color:inherit;font-size:12px;font-family:inherit;padding:3px 4px;outline:none;resize:none;line-height:1.4;transition:border-color .2s}
+.bd-note:focus{border-bottom-color:#3b82f6;background:rgba(59,130,246,.06);border-radius:3px 3px 0 0}
+.bd-note::placeholder{opacity:.35;font-style:italic}
+.bd-saved{font-size:10px;color:#22c55e;opacity:0;transition:opacity .3s;margin-left:4px}
+.bd-saved.show{opacity:1}
+canvas{display:block}
+</style>
+
+<style id="print-css">
+@media print {
+  @page { size: A4 landscape; margin: 10mm 12mm; }
+  body { background: #fff !important; color: #0f172a !important; font-size: 11px !important; }
+  #hdr { display: none !important; }
+  #seg-popup { display: none !important; }
+  #pdf-header { display: block !important; }
+  .card { background: #fff !important; border: 1px solid #e2e8f0 !important; page-break-inside: avoid; margin-bottom: 10px !important; padding: 12px !important; }
+  .date-btn { display: none !important; }
+  .date-btn.active { display: inline-block !important; background: #3b82f6 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .drow { margin-bottom: 8px !important; }
+  th { background: #f8fafc !important; color: #64748b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tr:nth-child(even) td { background: #f8fafc !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  canvas { max-width: 100% !important; }
+  .gantt-block { page-break-inside: avoid; }
+  .gtrack { background: transparent !important; border: 1px solid #e2e8f0 !important; }
+  .gseg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .speed-row { display: none !important; }
+  .bd-note { border: 1px solid #e2e8f0 !important; padding: 4px !important; }
+  tfoot td { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body class="dark">
+<div id="hdr">
+  <div class="logo">
+    <div class="dot"></div>
+    <span class="ttl">Filling Machine #1</span>
+    <span class="sub">OEE Dashboard</span>
+  </div>
+  <div class="ctrls">
+    <button class="btn on" id="bL" onclick="setView('live')">Live</button>
+    <button class="btn" id="bD" onclick="setView('daily')">Daily</button>
+    <button class="btn" id="bW" onclick="setView('weekly')">Weekly</button>
+    <span id="liveStatus" style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;opacity:.85;margin-left:4px"><span id="liveDot" style="width:8px;height:8px;border-radius:50%;background:#9ca3af"></span><span id="liveStatusText">connecting…</span></span>
+    <button class="btn thm" onclick="toggleTheme()">☀️</button>
+  </div>
+</div>
+<div id="pdf-header" style="display:none;padding:0 0 12px;border-bottom:2px solid #3b82f6;margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end">
+    <div>
+      <div style="font-size:20px;font-weight:700;color:#0f172a">Filling Machine #1 — OEE Dashboard</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px" id="pdf-subtitle"></div>
+    </div>
+    <div style="font-size:11px;color:#94a3b8" id="pdf-date"></div>
+  </div>
+</div>
+<div id="seg-popup">
+  <span class="popup-close" onclick="event.stopPropagation();closeSegPopup()">✕</span>
+  <div class="popup-title" id="popup-cur-label">Segment</div>
+  <div class="popup-section">Reclassify as</div>
+  <button class="popup-btn" onclick="reclassifySeg(1024)"><span class="dot" style="background:#dc2626"></span>Breakdown</button>
+  <button class="popup-btn" onclick="reclassifySeg(2)"><span class="dot" style="background:#f59e0b"></span>Changeover</button>
+  <button class="popup-btn" onclick="reclassifySeg(16)"><span class="dot" style="background:#3b82f6"></span>Planned Stop</button>
+  <hr class="popup-divider">
+  <div class="popup-section">Split segment</div>
+  <div style="font-size:11px;opacity:.5;margin-bottom:6px">First part duration (min)</div>
+  <div class="split-wrap">
+    <input class="split-input" type="number" id="split-mins" min="1" placeholder="e.g. 10" style="width:70px" oninput="const s=document.getElementById('split-slider');if(s)s.value=this.value">
+    <span id="split-of" style="font-size:11px;opacity:.45;white-space:nowrap">of — min total</span>
+  </div>
+  <div style="margin-top:6px">
+    <input type="range" id="split-slider" min="1" max="100" value="50"
+      style="width:100%;accent-color:#3b82f6;cursor:pointer"
+      oninput="onSplitSlider(this.value)">
+    <div style="display:flex;justify-content:space-between;font-size:10px;opacity:.4;margin-top:1px">
+      <span>0</span><span id="split-slider-mid"></span><span id="split-slider-max"></span>
+    </div>
+  </div>
+  <button style="width:100%;margin-top:8px;padding:7px;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600" onclick="splitSeg()">✂ Split</button>
+  <div id="split-error" style="color:#ef4444;font-size:11px;margin-top:5px;display:none"></div>
+</div>
+<div id="main"></div>
+<div class="tooltip" id="tip"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════
+let ROWS=[];  // populated by loadCSV()
+
+function parseCSVText(text) {
+  const lines = text.trim().split('\n');
+  // Skip header if present
+  const start = lines[0].startsWith('timestamp') ? 1 : 0;
+  return lines.slice(start).map(l => {
+    const p = l.trim().split(',');
+    if (p.length < 7) return null;
+    const [ts,g,e,d,sp,st,sk] = p;
+    const row = {ts:new Date(ts.replace('T',' ')),good:+g,empty:+e,defect:+d,speed:+sp,state:+st,sku:sk.trim()};
+    return isNaN(row.ts.getTime()) ? null : row;
+  }).filter(Boolean);
+}
+
+function loadCSV(text, filename) {
+  const parsed = parseCSVText(text);
+  if (!parsed.length) { alert('No valid rows found in CSV.'); return; }
+  parsed.sort((a,b) => a.ts - b.ts);
+  ROWS = parsed;
+  _WR = null;
+  SEL = localDate(ROWS[0].ts);
+  VIEW = 'daily';
+  // Update button states
+  const bD = document.getElementById('bD');
+  const bW = document.getElementById('bW');
+  if (bD) { bD.classList.add('on'); }
+  if (bW) { bW.classList.remove('on'); }
+  // Show filename
+  if (filename) {
+    const lbl = document.getElementById('fileLabel');
+    if (lbl) lbl.textContent = filename;
+  }
+  if (typeof render === 'function') render();
+}
+
+function importCSV(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => loadCSV(e.target.result, file.name);
+  reader.readAsText(file);
+  input.value = ''; // reset so same file can be re-imported
+}
+
+// ── Embedded fallback data (May 20) ──
+const FALLBACK=`2026-05-20 15:17:50,1,0,0,1,128,331TX
+2026-05-20 15:18:50,34,0,0,33,256,331TX
+2026-05-20 15:19:50,69,0,0,35,256,331TX
+2026-05-20 15:20:50,98,0,0,29,256,331TX
+2026-05-20 15:21:50,131,0,0,33,256,331TX
+2026-05-20 15:22:50,165,0,0,34,256,331TX
+2026-05-20 15:23:50,194,0,0,29,256,331TX
+2026-05-20 15:24:50,226,0,0,32,256,331TX
+2026-05-20 15:25:50,260,0,0,34,256,331TX
+2026-05-20 15:26:50,292,0,0,32,256,331TX
+2026-05-20 15:27:50,326,0,0,34,256,331TX
+2026-05-20 15:28:50,360,0,0,34,256,331TX
+2026-05-20 15:29:50,394,0,0,34,256,331TX
+2026-05-20 15:30:50,424,0,0,30,256,331TX
+2026-05-20 15:31:51,457,0,0,33,256,331TX
+2026-05-20 15:32:51,488,0,0,31,256,331TX
+2026-05-20 15:33:51,520,0,0,32,256,331TX
+2026-05-20 15:34:51,553,0,0,33,256,331TX
+2026-05-20 15:35:51,586,0,0,33,256,331TX
+2026-05-20 15:36:51,620,0,0,34,256,331TX
+2026-05-20 15:37:51,653,0,0,33,256,331TX
+2026-05-20 15:38:51,685,0,0,32,256,331TX
+2026-05-20 15:39:51,720,0,0,35,256,331TX
+2026-05-20 15:40:51,753,0,0,33,256,331TX
+2026-05-20 15:41:51,783,0,0,30,256,331TX
+2026-05-20 15:42:51,816,0,0,33,256,331TX
+2026-05-20 15:43:51,849,0,0,33,256,331TX
+2026-05-20 15:44:51,882,0,0,33,256,331TX
+2026-05-20 15:45:51,918,0,0,36,256,331TX
+2026-05-20 15:46:51,951,0,0,33,256,331TX
+2026-05-20 15:47:51,977,0,0,26,256,331TX
+2026-05-20 15:48:51,1002,0,0,25,256,331TX
+2026-05-20 15:49:51,1032,0,1,30,256,331TX
+2026-05-20 15:50:51,1069,0,1,37,256,331TX
+2026-05-20 15:51:51,1092,0,1,23,256,331TX
+2026-05-20 15:52:51,1125,1,1,33,256,331TX
+2026-05-20 15:53:51,1154,1,1,29,256,331TX
+2026-05-20 15:54:51,1187,1,1,33,256,331TX
+2026-05-20 15:55:52,1223,1,1,36,256,331TX
+2026-05-20 15:56:52,1250,1,1,27,256,331TX
+2026-05-20 15:57:52,1284,1,1,34,256,331TX
+2026-05-20 15:58:52,1316,1,1,32,256,331TX
+2026-05-20 15:59:52,1351,1,1,35,256,331TX
+2026-05-20 16:00:52,1377,1,1,26,256,331TX
+2026-05-20 16:01:52,1407,1,1,30,256,331TX
+2026-05-20 16:02:52,1443,1,1,36,256,331TX
+2026-05-20 16:03:52,1477,1,1,34,256,331TX
+2026-05-20 16:04:52,1509,2,1,32,256,331TX
+2026-05-20 16:05:52,1537,5,1,28,256,331TX
+2026-05-20 16:06:52,1572,6,1,35,256,331TX
+2026-05-20 16:07:52,1597,7,1,25,256,331TX
+2026-05-20 16:08:52,1630,7,1,33,256,331TX
+2026-05-20 16:09:52,1656,8,1,26,256,331TX
+2026-05-20 16:10:52,1686,10,1,30,256,331TX
+2026-05-20 16:11:52,1703,10,1,17,256,331TX
+2026-05-20 16:12:52,1716,12,1,13,256,331TX
+2026-05-20 16:13:52,1751,12,1,35,256,331TX
+2026-05-20 16:14:52,1782,12,1,31,256,331TX
+2026-05-20 16:15:52,1810,12,1,28,256,331TX
+2026-05-20 16:16:52,1845,12,1,35,256,331TX
+2026-05-20 16:17:52,1877,12,1,32,256,331TX
+2026-05-20 16:18:52,1911,12,1,34,256,331TX
+2026-05-20 16:19:52,1943,12,1,32,256,331TX
+2026-05-20 16:20:52,1978,12,1,35,256,331TX
+2026-05-20 16:21:52,2011,12,1,33,256,331TX
+2026-05-20 16:22:52,2039,13,1,28,256,331TX
+2026-05-20 16:23:53,2071,13,1,32,256,331TX
+2026-05-20 16:24:53,2108,13,1,37,256,331TX
+2026-05-20 16:25:53,2141,13,1,33,256,331TX
+2026-05-20 16:26:53,2168,13,1,27,256,331TX
+2026-05-20 16:27:53,2180,13,1,12,256,331TX
+2026-05-20 16:28:53,2204,15,1,24,256,331TX
+2026-05-20 16:29:53,2229,17,1,25,256,331TX
+2026-05-20 16:30:53,2256,17,1,27,256,331TX
+2026-05-20 16:31:53,2290,18,1,34,256,331TX
+2026-05-20 16:32:53,2311,18,1,21,128,331TX
+2026-05-20 16:33:53,2340,18,1,29,256,331TX
+2026-05-20 16:34:53,2373,18,1,33,256,331TX
+2026-05-20 16:35:53,2406,18,1,33,256,331TX
+2026-05-20 16:36:53,2432,20,1,26,256,331TX
+2026-05-20 16:37:53,2460,22,1,28,256,331TX
+2026-05-20 16:38:53,2491,24,1,31,256,331TX
+2026-05-20 16:39:53,2512,26,1,21,128,331TX
+2026-05-20 16:40:53,2540,30,1,28,256,331TX
+2026-05-20 16:41:53,2574,30,1,34,256,331TX
+2026-05-20 16:42:53,2594,30,1,20,128,331TX
+2026-05-20 16:43:53,2594,30,1,0,256,331TX
+2026-05-20 16:44:53,2609,30,1,15,256,331TX
+2026-05-20 16:45:53,2638,30,1,29,256,331TX
+2026-05-20 16:46:53,2640,30,1,2,256,331TX
+2026-05-20 16:47:53,2640,30,1,0,1024,331TX
+2026-05-20 16:48:53,2640,30,1,0,1024,331TX
+2026-05-20 16:49:53,2640,30,1,0,1024,331TX
+2026-05-20 16:50:53,2640,30,1,0,1024,331TX
+2026-05-20 16:51:53,2640,30,1,0,1024,331TX
+2026-05-20 16:52:53,2640,30,1,0,1024,331TX
+2026-05-20 16:53:53,2640,30,1,0,1024,331TX
+2026-05-20 16:54:53,2640,30,1,0,1024,331TX
+2026-05-20 16:55:53,2640,30,1,0,1024,331TX
+2026-05-20 16:56:53,2640,30,1,0,1024,331TX
+2026-05-20 16:57:53,2640,30,1,0,1024,331TX
+2026-05-20 16:58:53,2640,30,1,0,1024,331TX
+2026-05-20 16:59:53,2640,30,1,0,1024,331TX
+2026-05-20 17:00:54,2640,30,1,0,1024,331TX
+2026-05-20 17:01:54,2640,30,1,0,1024,331TX
+2026-05-20 17:02:54,2640,30,1,0,1024,331TX
+2026-05-20 17:03:54,2640,30,1,0,1024,331TX
+2026-05-20 17:04:54,2640,30,1,0,1024,331TX
+2026-05-20 17:05:54,2640,30,1,0,1024,331TX
+2026-05-20 17:06:54,2640,30,1,0,1024,331TX
+2026-05-20 17:07:54,2658,32,1,18,128,331TX
+2026-05-20 17:08:54,2680,33,1,22,128,331TX
+2026-05-20 17:09:54,2709,33,1,29,256,331TX
+2026-05-20 17:10:54,2744,33,1,35,256,331TX
+2026-05-20 17:11:54,2775,33,1,31,256,331TX
+2026-05-20 17:12:54,2807,35,1,32,256,331TX
+2026-05-20 17:13:54,2838,35,1,31,256,331TX
+2026-05-20 17:14:54,2864,37,1,26,256,331TX
+2026-05-20 17:15:54,2891,38,1,27,256,331TX
+2026-05-20 17:16:54,2915,39,1,24,256,331TX
+2026-05-20 17:17:54,2926,39,1,11,256,331TX
+2026-05-20 17:18:54,2933,39,1,7,256,331TX
+2026-05-20 17:19:54,2951,39,1,18,128,331TX
+2026-05-20 17:20:54,2968,41,1,17,256,331TX
+2026-05-20 17:21:54,2990,44,1,22,128,331TX
+2026-05-20 17:22:54,3021,46,1,31,256,331TX
+2026-05-20 17:23:54,3051,47,1,30,256,331TX
+2026-05-20 17:24:54,3060,47,1,9,256,331TX
+2026-05-20 17:25:54,3083,47,1,23,256,331TX
+2026-05-20 17:26:54,3115,47,1,32,256,331TX
+2026-05-20 17:27:54,3146,47,1,31,256,331TX
+2026-05-20 17:28:55,3181,49,1,35,256,331TX
+2026-05-20 17:29:55,3213,50,1,32,256,331TX
+2026-05-20 17:30:55,3246,50,1,33,256,331TX
+2026-05-20 17:31:55,3278,51,1,32,256,331TX
+2026-05-20 17:32:55,3310,51,1,32,256,331TX
+2026-05-20 17:33:55,3346,51,1,36,256,331TX
+2026-05-20 17:34:55,3378,51,1,32,256,331TX
+2026-05-20 17:35:55,3406,51,1,28,256,331TX
+2026-05-20 17:36:55,3438,52,1,32,256,331TX
+2026-05-20 17:37:55,3469,52,1,31,256,331TX
+2026-05-20 17:38:55,3496,53,1,27,256,331TX
+2026-05-20 17:39:55,3532,53,1,36,256,331TX
+2026-05-20 17:40:55,3562,53,1,30,256,331TX
+2026-05-20 17:41:55,3579,53,1,17,256,331TX
+2026-05-20 17:42:55,3608,53,1,29,256,331TX
+2026-05-20 17:43:55,3641,53,1,33,256,331TX
+2026-05-20 17:44:55,3673,53,1,32,256,331TX
+2026-05-20 17:45:55,3703,53,1,30,256,331TX
+2026-05-20 17:46:55,3733,54,1,30,256,331TX
+2026-05-20 17:47:55,3764,55,1,31,256,331TX
+2026-05-20 17:48:55,3789,58,1,25,256,331TX
+2026-05-20 17:49:55,3820,61,1,31,256,331TX
+2026-05-20 17:50:55,3843,65,1,23,256,331TX
+2026-05-20 17:51:55,3872,67,1,29,256,331TX
+2026-05-20 17:52:55,3901,68,1,29,256,331TX
+2026-05-20 17:53:55,3924,69,1,23,256,331TX
+2026-05-20 17:54:55,3939,72,1,15,256,331TX
+2026-05-20 17:55:55,3957,74,1,18,128,331TX
+2026-05-20 17:56:55,3982,75,1,25,256,331TX
+2026-05-20 17:57:55,4001,75,1,19,128,331TX
+2026-05-20 17:58:55,4011,75,1,10,256,331TX
+2026-05-20 17:59:56,4017,75,1,6,256,331TX
+2026-05-20 18:00:56,4023,76,1,6,512,331TX
+2026-05-20 18:01:56,4029,77,1,6,512,331TX
+2026-05-20 18:02:56,4035,77,1,6,512,331TX
+2026-05-20 18:03:56,4037,77,1,2,512,331TX
+2026-05-20 18:04:56,4037,77,1,0,512,331TX
+2026-05-20 18:05:56,4037,77,1,0,512,331TX
+2026-05-20 18:06:56,4037,77,1,0,512,331TX
+2026-05-20 18:07:56,4037,77,1,0,512,331TX
+2026-05-20 18:08:56,4038,77,1,1,512,331TX
+2026-05-20 18:09:56,4038,77,1,0,512,331TX
+2026-05-20 18:10:56,4043,78,1,5,512,331TX
+2026-05-20 18:11:56,4064,80,1,21,512,SP33
+2026-05-20 18:12:56,4088,81,1,24,512,SP33
+2026-05-20 18:13:56,4109,81,1,21,512,SP33
+2026-05-20 18:14:56,4135,81,1,26,512,SP33
+2026-05-20 18:15:56,4154,81,1,19,512,SP33
+2026-05-20 18:16:56,4179,81,1,25,512,SP33
+2026-05-20 18:17:56,4200,84,1,21,512,SP33
+2026-05-20 18:18:56,4221,85,1,21,512,SP33
+2026-05-20 18:19:56,4248,85,1,27,512,SP33
+2026-05-20 18:20:56,4260,87,1,12,512,SP33
+2026-05-20 18:21:56,4273,90,2,13,512,SP33
+2026-05-20 18:22:56,4281,94,4,8,512,SP33
+2026-05-20 18:23:56,4289,98,4,8,512,SP33
+2026-05-20 18:24:56,4296,99,5,7,512,SP33
+2026-05-20 18:25:56,4304,101,5,8,512,SP33
+2026-05-20 18:26:56,4316,102,5,12,512,SP33
+2026-05-20 18:27:56,4335,102,5,19,512,SP33
+2026-05-20 18:28:56,4342,103,5,7,512,SP33
+2026-05-20 18:29:56,4361,104,5,19,512,SP33
+2026-05-20 18:30:56,4386,106,5,25,512,SP33
+2026-05-20 18:31:57,4406,108,5,20,512,SP33
+2026-05-20 18:32:57,4422,111,7,16,512,SP33
+2026-05-20 18:33:57,4446,114,7,24,512,SP33
+2026-05-20 18:34:57,4466,115,8,20,512,SP33
+2026-05-20 18:35:57,4477,118,8,11,512,SP33
+2026-05-20 18:36:57,4487,119,8,10,512,SP33
+2026-05-20 18:37:57,4508,119,8,21,512,SP33
+2026-05-20 18:38:57,4530,119,8,22,512,SP33
+2026-05-20 18:39:57,4550,120,8,20,512,SP33
+2026-05-20 18:40:57,4575,120,8,25,512,SP33
+2026-05-20 18:41:57,4603,125,8,28,512,SP33
+2026-05-20 18:42:57,4623,125,8,20,512,SP33
+2026-05-20 18:43:57,4639,127,8,16,512,SP33
+2026-05-20 18:44:57,4654,129,8,15,512,SP33
+2026-05-20 18:45:57,4676,129,8,22,512,SP33
+2026-05-20 18:46:57,4702,131,9,26,512,SP33
+2026-05-20 18:47:57,4731,131,9,29,512,SP33
+2026-05-20 18:48:57,4756,131,9,25,512,SP33
+2026-05-20 18:49:57,4783,132,9,27,512,SP33
+2026-05-20 18:50:57,4807,136,9,24,512,SP33
+2026-05-20 18:51:57,4831,137,9,24,512,SP33
+2026-05-20 18:52:57,4857,138,9,26,512,SP33
+2026-05-20 18:53:57,4878,141,9,21,512,SP33
+2026-05-20 18:54:57,4902,141,9,24,512,SP33
+2026-05-20 18:55:57,4926,143,9,24,512,SP33
+2026-05-20 18:56:58,4946,143,9,20,512,SP33
+2026-05-20 18:57:58,4967,143,9,21,512,SP33
+2026-05-20 18:58:58,4986,144,9,19,512,SP33
+2026-05-20 18:59:58,5011,144,9,25,512,SP33
+2026-05-20 19:00:58,5039,145,9,28,512,SP33
+2026-05-20 19:01:58,5058,146,9,19,512,SP33
+2026-05-20 19:02:58,5084,146,9,26,512,SP33
+2026-05-20 19:03:58,5110,146,9,26,512,SP33
+2026-05-20 19:04:58,5136,147,9,26,512,SP33
+2026-05-20 19:05:58,5163,147,9,27,512,SP33
+2026-05-20 19:06:58,5188,149,9,25,512,SP33
+2026-05-20 19:07:58,5198,149,9,10,512,SP33
+2026-05-20 19:08:58,5221,150,9,23,512,SP33
+2026-05-20 19:09:58,5246,150,9,25,512,SP33
+2026-05-20 19:10:58,5273,150,9,27,512,SP33
+2026-05-20 19:11:58,5297,152,9,24,512,SP33
+2026-05-20 19:12:58,5325,154,9,28,512,SP33
+2026-05-20 19:13:58,5344,155,9,19,512,SP33
+2026-05-20 19:14:58,5370,155,9,26,512,SP33
+2026-05-20 19:15:58,5391,156,9,21,512,SP33
+2026-05-20 19:16:58,5417,157,9,26,512,SP33
+2026-05-20 19:17:58,5418,158,9,1,512,SP33
+2026-05-20 19:18:58,5424,159,9,6,512,SP33
+2026-05-20 19:19:58,5443,160,9,19,512,SP33
+2026-05-20 19:20:58,5458,160,9,15,512,SP33
+2026-05-20 19:21:59,5487,161,9,29,512,SP33
+2026-05-20 19:22:59,5512,163,9,25,512,SP33
+2026-05-20 19:23:59,5539,163,9,27,512,SP33
+2026-05-20 19:24:59,5558,163,10,19,512,SP33
+2026-05-20 19:25:59,5584,163,10,26,512,SP33
+2026-05-20 19:26:59,5609,165,10,25,512,SP33
+2026-05-20 19:27:59,5632,165,10,23,512,SP33
+2026-05-20 19:28:59,5654,167,10,22,512,SP33
+2026-05-20 19:29:59,5679,168,10,25,512,SP33
+2026-05-20 19:30:59,5703,169,10,24,512,SP33
+2026-05-20 19:31:59,5730,169,10,27,512,SP33
+2026-05-20 19:32:59,5755,170,10,25,512,SP33
+2026-05-20 19:33:59,5780,170,10,25,512,SP33
+2026-05-20 19:34:59,5803,170,10,23,512,SP33
+2026-05-20 19:35:59,5829,172,10,26,512,SP33
+2026-05-20 19:36:59,5854,172,10,25,512,SP33
+2026-05-20 19:37:59,5881,172,10,27,512,SP33
+2026-05-20 19:38:59,5906,172,10,25,512,SP33
+2026-05-20 19:39:59,5933,172,10,27,512,SP33
+2026-05-20 19:40:59,5961,172,10,28,512,SP33
+2026-05-20 19:41:59,5986,172,10,25,512,SP33
+2026-05-20 19:42:59,6014,172,10,28,512,SP33
+2026-05-20 19:43:59,6037,172,10,23,512,SP33
+2026-05-20 19:44:59,6063,172,10,26,512,SP33
+2026-05-20 19:45:59,6089,172,10,26,512,SP33
+2026-05-20 19:46:59,6115,172,10,26,512,SP33
+2026-05-20 19:47:59,6140,172,10,25,512,SP33
+2026-05-20 19:48:59,6158,172,10,18,512,SP33
+2026-05-20 19:49:59,6182,172,10,24,512,SP33
+2026-05-20 19:50:59,6208,172,10,26,512,SP33
+2026-05-20 19:51:59,6230,174,10,22,512,SP33
+2026-05-20 19:52:59,6254,176,10,24,512,SP33
+2026-05-20 19:54:00,6282,177,10,28,512,SP33
+2026-05-20 19:55:00,6308,177,10,26,512,SP33
+2026-05-20 19:56:00,6334,177,10,26,512,SP33
+2026-05-20 19:57:00,6362,177,10,28,512,SP33
+2026-05-20 19:58:00,6384,177,10,22,512,SP33
+2026-05-20 19:59:00,6408,179,10,24,512,SP33
+2026-05-20 20:00:00,6435,179,10,27,512,SP33
+2026-05-20 20:01:00,6464,183,10,29,512,SP33
+2026-05-20 20:02:00,6487,186,10,23,512,SP33
+2026-05-20 20:03:00,6512,188,10,25,512,SP33
+2026-05-20 20:04:00,6539,188,10,27,512,SP33
+2026-05-20 20:05:00,6567,189,10,28,512,SP33
+2026-05-20 20:06:00,6595,192,10,28,512,SP33
+2026-05-20 20:07:00,6620,192,10,25,512,SP33
+2026-05-20 20:08:00,6644,192,10,24,512,SP33
+2026-05-20 20:09:00,6663,192,10,19,512,SP33
+2026-05-20 20:10:00,6690,193,10,27,512,SP33
+2026-05-20 20:11:00,6717,193,10,27,512,SP33
+2026-05-20 20:12:00,6737,193,10,20,512,SP33
+2026-05-20 20:13:00,6761,193,10,24,512,SP33
+2026-05-20 20:14:00,6784,194,10,23,512,SP33
+2026-05-20 20:15:00,6809,194,10,25,512,SP33
+2026-05-20 20:16:00,6835,194,10,26,512,SP33
+2026-05-20 20:17:00,6851,194,10,16,512,SP33
+2026-05-20 20:18:00,6878,194,10,27,512,SP33
+2026-05-20 20:19:00,6903,194,10,25,512,SP33
+2026-05-20 20:20:00,6928,195,10,25,512,SP33
+2026-05-20 20:21:01,6950,195,10,22,512,SP33
+2026-05-20 20:22:01,6976,195,10,26,512,SP33
+2026-05-20 20:23:01,6999,195,10,23,512,SP33
+2026-05-20 20:24:01,7023,196,10,24,512,SP33
+2026-05-20 20:25:01,7051,197,10,28,512,SP33
+2026-05-20 20:26:01,7076,197,10,25,512,SP33
+2026-05-20 20:27:01,7103,197,10,27,512,SP33
+2026-05-20 20:28:01,7130,197,10,27,512,SP33
+2026-05-20 20:29:01,7149,200,10,19,512,SP33
+2026-05-20 20:30:01,7174,200,10,25,512,SP33
+2026-05-20 20:31:01,7201,200,10,27,512,SP33
+2026-05-20 20:32:01,7223,201,10,22,512,SP33
+2026-05-20 20:33:01,7247,201,10,24,512,SP33
+2026-05-20 20:34:01,7269,201,10,22,512,SP33
+2026-05-20 20:35:01,7288,202,10,19,512,SP33
+2026-05-20 20:36:01,7308,202,10,20,512,SP33
+2026-05-20 20:37:01,7314,202,10,6,512,SP33
+2026-05-20 20:38:01,7314,202,10,0,512,SP33
+2026-05-20 20:39:01,7317,202,10,3,512,SP33
+2026-05-20 20:40:01,7319,202,10,2,512,SP33
+2026-05-20 20:41:01,7323,202,10,4,512,SP33
+2026-05-20 20:42:01,7341,203,10,18,512,SP33
+2026-05-20 20:43:01,7368,203,10,27,512,SP33
+2026-05-20 20:44:01,7392,203,10,24,512,SP33
+2026-05-20 20:45:01,7418,203,10,26,512,SP33
+2026-05-20 20:46:01,7439,203,10,21,512,SP33
+2026-05-20 20:47:01,7466,203,10,27,512,SP33
+2026-05-20 20:48:01,7495,203,10,29,512,SP33
+2026-05-20 20:49:01,7521,203,10,26,512,SP33
+2026-05-20 20:50:01,7549,203,10,28,512,SP33
+2026-05-20 20:51:01,7574,203,10,25,512,SP33
+2026-05-20 20:52:02,7602,203,10,28,512,SP33
+2026-05-20 20:53:02,7630,203,10,28,512,SP33
+2026-05-20 20:54:02,7648,204,10,18,512,SP33
+2026-05-20 20:55:02,7667,205,10,19,512,SP33
+2026-05-20 20:56:02,7691,205,10,24,512,SP33
+2026-05-20 20:57:02,7721,205,10,30,512,SP33
+2026-05-20 20:58:02,7744,205,10,23,512,SP33
+2026-05-20 20:59:02,7773,205,10,29,512,SP33
+2026-05-20 21:00:02,7799,205,10,26,512,SP33
+2026-05-20 21:01:02,7827,205,10,28,512,SP33
+2026-05-20 21:02:02,7855,205,10,28,512,SP33
+2026-05-20 21:03:02,7881,205,10,26,512,SP33
+2026-05-20 21:04:02,7909,205,10,28,512,SP33
+2026-05-20 21:05:02,7932,206,10,23,512,SP33
+2026-05-20 21:06:02,7952,207,10,20,512,SP33
+2026-05-20 21:07:02,7981,209,10,29,512,SP33
+2026-05-20 21:08:02,8009,209,10,28,512,SP33
+2026-05-20 21:09:02,8036,209,10,27,512,SP33
+2026-05-20 21:10:02,8066,210,10,30,512,SP33
+2026-05-20 21:11:02,8084,211,11,18,512,SP33
+2026-05-20 21:12:02,8103,212,11,19,512,SP33
+2026-05-20 21:13:02,8126,212,11,23,512,SP33
+2026-05-20 21:14:02,8148,213,11,22,512,SP33
+2026-05-20 21:15:02,8174,214,11,26,512,SP33
+2026-05-20 21:16:02,8197,214,11,23,512,SP33
+2026-05-20 21:17:02,8214,214,11,17,512,SP33
+2026-05-20 21:18:02,8240,214,11,26,512,SP33
+2026-05-20 21:19:02,8266,214,11,26,512,SP33
+2026-05-20 21:20:02,8293,214,11,27,512,SP33
+2026-05-20 21:21:02,8321,214,11,28,512,SP33
+2026-05-20 21:22:02,8348,215,11,27,512,SP33
+2026-05-20 21:23:02,8372,217,11,24,512,SP33
+2026-05-20 21:24:02,8400,217,11,28,512,SP33
+2026-05-20 21:25:03,8429,217,11,29,512,SP33
+2026-05-20 21:26:03,8456,217,11,27,512,SP33
+2026-05-20 21:27:03,8483,217,11,27,512,SP33
+2026-05-20 21:28:03,8509,217,11,26,512,SP33
+2026-05-20 21:29:03,8522,217,11,13,512,SP33
+2026-05-20 21:30:03,8537,217,11,15,512,SP33
+2026-05-20 21:31:03,8553,219,11,16,512,SP33
+2026-05-20 21:32:03,8575,220,11,22,512,SP33
+2026-05-20 21:33:03,8602,220,11,27,512,SP33
+2026-05-20 21:34:03,8629,220,11,27,512,SP33
+2026-05-20 21:35:03,8648,220,11,19,512,SP33
+2026-05-20 21:36:03,8675,221,11,27,512,SP33
+2026-05-20 21:37:03,8703,222,11,28,512,SP33
+2026-05-20 21:38:03,8729,222,11,26,512,SP33
+2026-05-20 21:39:03,8756,222,11,27,512,SP33
+2026-05-20 21:40:03,8782,222,11,26,512,SP33
+2026-05-20 21:41:03,8810,223,11,28,512,SP33
+2026-05-20 21:42:03,8836,224,11,26,512,SP33
+2026-05-20 21:43:03,8865,224,11,29,512,SP33
+2026-05-20 21:44:03,8887,225,11,22,512,SP33
+2026-05-20 21:45:03,8913,225,11,26,512,SP33
+2026-05-20 21:46:03,8940,225,11,27,512,SP33
+2026-05-20 21:47:03,8968,225,11,28,512,SP33
+2026-05-20 21:48:03,8996,225,11,28,512,SP33
+2026-05-20 21:49:04,9024,225,11,28,512,SP33
+2026-05-20 21:50:04,9050,225,11,26,512,SP33
+2026-05-20 21:51:04,9079,225,11,29,512,SP33
+2026-05-20 21:52:04,9106,225,11,27,512,SP33
+2026-05-20 21:53:04,9132,225,11,26,512,SP33
+2026-05-20 21:54:04,9156,226,11,24,512,SP33
+2026-05-20 21:55:04,9183,228,11,27,512,SP33
+2026-05-20 21:56:04,9207,228,11,24,512,SP33
+2026-05-20 21:57:04,9227,229,11,20,512,SP33
+2026-05-20 21:58:04,9255,229,11,28,512,SP33
+2026-05-20 21:59:04,9261,229,11,6,512,SP33
+2026-05-20 22:00:04,9278,229,11,17,512,SP33
+2026-05-20 22:01:04,9306,229,11,28,512,SP33
+2026-05-20 22:02:04,9334,229,11,28,512,SP33
+2026-05-20 22:03:04,9363,229,11,29,512,SP33
+2026-05-20 22:04:04,9389,230,11,26,512,SP33
+2026-05-20 22:05:04,9406,230,11,17,512,SP33
+2026-05-20 22:06:04,9433,230,11,27,512,SP33
+2026-05-20 22:07:04,9456,230,11,23,512,SP33
+2026-05-20 22:08:04,9470,231,11,14,512,SP33
+2026-05-20 22:09:04,9486,232,11,16,512,SP33
+2026-05-20 22:10:04,9504,232,11,18,512,SP33
+2026-05-20 22:11:04,9526,232,11,22,512,SP33
+2026-05-20 22:12:04,9548,232,11,22,512,SP33
+2026-05-20 22:13:04,9556,232,11,8,512,SP33
+2026-05-20 22:14:04,9575,234,11,19,512,SP33
+2026-05-20 22:15:04,9603,234,11,28,512,SP33
+2026-05-20 22:16:05,9630,234,11,27,512,SP33
+2026-05-20 22:17:05,9654,235,11,24,512,SP33
+2026-05-20 22:18:05,9681,239,11,27,512,SP33
+2026-05-20 22:19:05,9709,239,11,28,512,SP33
+2026-05-20 22:20:05,9737,240,11,28,512,SP33
+2026-05-20 22:21:05,9759,242,11,22,512,SP33
+2026-05-20 22:22:05,9788,242,11,29,512,SP33
+2026-05-20 22:23:05,9812,242,11,24,512,SP33
+2026-05-20 22:24:05,9812,242,11,0,512,SP33
+2026-05-20 22:25:05,9812,242,11,0,512,SP33
+2026-05-20 22:26:05,9821,242,11,9,512,SP33
+2026-05-20 22:27:05,9846,245,11,25,512,SP33
+2026-05-20 22:28:05,9874,247,11,28,512,SP33
+2026-05-20 22:29:05,9902,248,11,28,512,SP33
+2026-05-20 22:30:05,9927,248,11,25,512,SP33
+2026-05-20 22:31:05,9956,248,11,29,512,SP33
+2026-05-20 22:32:05,9981,249,11,25,512,SP33
+2026-05-20 22:33:05,10008,251,11,27,512,SP33
+2026-05-20 22:34:05,10035,252,11,27,512,SP33
+2026-05-20 22:35:05,10060,252,11,25,512,SP33
+2026-05-20 22:36:05,10086,253,11,26,512,SP33
+2026-05-20 22:37:05,10114,253,11,28,512,SP33
+2026-05-20 22:38:05,10144,254,11,30,512,SP33
+2026-05-20 22:39:05,10171,255,11,27,512,SP33
+2026-05-20 22:40:05,10201,255,11,30,512,SP33
+2026-05-20 22:41:05,10219,255,11,18,512,SP33
+2026-05-20 22:42:05,10246,255,11,27,512,SP33
+2026-05-20 22:43:05,10274,255,11,28,512,SP33
+2026-05-20 22:44:05,10301,255,11,27,512,SP33
+2026-05-20 22:45:05,10327,255,11,26,512,SP33
+2026-05-20 22:46:05,10357,255,11,30,512,SP33
+2026-05-20 22:47:05,10382,255,11,25,512,SP33
+2026-05-20 22:48:05,10409,256,11,27,512,SP33
+2026-05-20 22:49:05,10436,256,11,27,512,SP33
+2026-05-20 22:50:06,10456,256,11,20,512,SP33
+2026-05-20 22:51:06,10477,256,11,21,512,SP33
+2026-05-20 22:52:06,10504,256,11,27,512,SP33
+2026-05-20 22:53:06,10532,256,11,28,512,SP33
+2026-05-20 22:54:06,10547,256,11,15,512,SP33
+2026-05-20 22:55:06,10554,256,11,7,512,SP33
+2026-05-20 22:56:06,10559,256,11,5,512,SP33
+2026-05-20 22:57:06,10584,256,11,25,512,SP33
+2026-05-20 22:58:06,10611,256,11,27,512,SP33
+2026-05-20 22:59:06,10639,256,11,28,512,SP33
+2026-05-20 23:00:06,10663,256,11,24,512,SP33
+2026-05-20 23:01:06,10692,256,11,29,512,SP33
+2026-05-20 23:02:06,10711,258,11,19,512,SP33
+2026-05-20 23:03:06,10733,258,11,22,512,SP33
+2026-05-20 23:04:06,10759,258,11,26,512,SP33
+2026-05-20 23:05:06,10784,261,11,25,512,SP33
+2026-05-20 23:06:06,10811,262,11,27,512,SP33
+2026-05-20 23:07:06,10836,262,11,25,512,SP33
+2026-05-20 23:08:06,10856,262,11,20,512,SP33
+2026-05-20 23:09:06,10881,262,11,25,512,SP33
+2026-05-20 23:10:06,10907,262,11,26,512,SP33
+2026-05-20 23:11:06,10930,262,11,23,512,SP33
+2026-05-20 23:12:06,10956,263,11,26,512,SP33
+2026-05-20 23:13:06,10983,263,11,27,512,SP33
+2026-05-20 23:14:06,11009,263,11,26,512,SP33
+2026-05-20 23:15:06,11036,263,11,27,512,SP33
+2026-05-20 23:16:07,11063,263,11,27,512,SP33
+2026-05-20 23:17:07,11087,263,11,24,512,SP33
+2026-05-20 23:18:07,11112,263,11,25,512,SP33
+2026-05-20 23:19:07,11135,264,11,23,512,SP33
+2026-05-20 23:20:07,11163,264,11,28,512,SP33
+2026-05-20 23:21:07,11190,264,11,27,512,SP33
+2026-05-20 23:22:07,11216,264,11,26,512,SP33
+2026-05-20 23:23:07,11240,268,11,24,512,SP33
+2026-05-20 23:24:07,11268,268,11,28,512,SP33
+2026-05-20 23:25:07,11293,268,11,25,512,SP33
+2026-05-20 23:26:07,11318,268,11,25,512,SP33
+2026-05-20 23:27:07,11337,268,11,19,512,SP33
+2026-05-20 23:28:07,11347,268,11,10,512,SP33
+2026-05-20 23:29:07,11371,268,11,24,512,SP33
+2026-05-20 23:30:07,11396,268,11,25,512,SP33
+2026-05-20 23:31:07,11423,268,11,27,512,SP33
+2026-05-20 23:32:07,11451,268,11,28,512,SP33
+2026-05-20 23:33:07,11475,268,11,24,512,SP33
+2026-05-20 23:34:07,11504,268,11,29,512,SP33
+2026-05-20 23:35:07,11529,269,11,25,512,SP33
+2026-05-20 23:36:07,11555,272,11,26,512,SP33
+2026-05-20 23:37:07,11576,273,11,21,512,SP33
+2026-05-20 23:38:07,11604,273,11,28,512,SP33
+2026-05-20 23:39:07,11625,273,11,21,512,SP33
+2026-05-20 23:40:07,11642,273,11,17,512,SP33
+2026-05-20 23:41:07,11657,275,11,15,512,SP33
+2026-05-20 23:42:07,11682,276,11,25,512,SP33
+2026-05-20 23:43:07,11710,276,11,28,512,SP33
+2026-05-20 23:44:07,11737,276,11,27,512,SP33
+2026-05-20 23:45:08,11764,276,11,27,512,SP33
+2026-05-20 23:46:08,11784,279,11,20,512,SP33
+2026-05-20 23:47:08,11808,279,11,24,512,SP33
+2026-05-20 23:48:08,11836,280,11,28,512,SP33
+2026-05-20 23:49:08,11863,280,11,27,512,SP33
+2026-05-20 23:50:08,11887,282,11,24,512,SP33
+2026-05-20 23:51:08,11913,282,11,26,512,SP33
+2026-05-20 23:52:08,11940,282,11,27,512,SP33
+2026-05-20 23:53:08,11965,282,11,25,512,SP33
+2026-05-20 23:54:08,11990,282,11,25,512,SP33
+2026-05-20 23:55:08,12010,282,11,20,512,SP33
+2026-05-20 23:56:08,12037,282,11,27,512,SP33
+2026-05-20 23:57:08,12066,282,11,29,512,SP33
+2026-05-20 23:58:08,12090,282,11,24,512,SP33
+2026-05-20 23:59:08,12119,282,11,29,512,SP33`;
+
+// ═══════════════════════════════════════════════════════
+//  PARSE + HELPERS
+// ═══════════════════════════════════════════════════════
+const SEEDS=[1,0.94,0.97,1.03,0.91,0.88,0.96];
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const D=s=>document.body.classList.contains('dark');
+
+function fT(d){return d.toTimeString().slice(0,5);}
+function localDate(d){
+  // Returns 'YYYY-MM-DD' in LOCAL timezone (not UTC)
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const dd=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+dd;
+}
+function fDur(m){return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(Math.round(m%60)).padStart(2,'0')}`;}
+function sInfo(c){
+  if([1,256].includes(c))  return{n:'Operating',   c:'#22c55e'};  // green
+  if([2,512].includes(c))  return{n:'Changeover',  c:'#f59e0b'};  // amber
+  if(c===16)               return{n:'Planned Stop', c:'#3b82f6'};  // blue
+  if(c===128)              return{n:'Minor Stop',   c:'#a855f7'};  // purple (same as 2048)
+  if(c===1024)             return{n:'Breakdown',    c:'#dc2626'};  // bright red
+  if(c===2048)             return{n:'Minor Stop',   c:'#a855f7'};  // purple
+  return{n:'Unknown',c:'#9ca3af'};
+}
+
+function skuRuns(rows){
+  if(!rows.length)return[];
+  const out=[];
+  let c={sku:rows[0].sku,st:rows[0].ts,g:rows[0].good,e:rows[0].empty,d:rows[0].defect};
+  for(let i=1;i<rows.length;i++){
+    if(rows[i].sku!==c.sku){
+      out.push({sku:c.sku,start:c.st,end:rows[i-1].ts,good:Math.max(0,rows[i-1].good-c.g),empty:Math.max(0,rows[i-1].empty-c.e),defect:Math.max(0,rows[i-1].defect-c.d)});
+      c={sku:rows[i].sku,st:rows[i].ts,g:rows[i].good,e:rows[i].empty,d:rows[i].defect};
+    }
+  }
+  const L=rows[rows.length-1];
+  out.push({sku:c.sku,start:c.st,end:L.ts,good:Math.max(0,L.good-c.g),empty:Math.max(0,L.empty-c.e),defect:Math.max(0,L.defect-c.d)});
+  return out.map(r=>({...r,dur:(r.end-r.start)/60000}));
+}
+function hourlyBars(rows){
+  const m={};for(let h=0;h<24;h++)m[h]={h,g:0,e:0,d:0};
+  for(let i=1;i<rows.length;i++){
+    const h=rows[i].ts.getHours();
+    m[h].g+=Math.max(0,rows[i].good-rows[i-1].good);
+    m[h].e+=Math.max(0,rows[i].empty-rows[i-1].empty);
+    m[h].d+=Math.max(0,rows[i].defect-rows[i-1].defect);
+  }
+  // Always return all 24 hours
+  return Object.values(m);
+}
+function calcOEE(rows){
+  if(rows.length<2)return{avail:0,perf:0,qual:0,oee:0};
+  let ps=0,bd=0,ms=0,op=0;
+  const total=(rows[rows.length-1].ts-rows[0].ts)/60000;
+  for(let i=1;i<rows.length;i++){
+    const dur=(rows[i].ts-rows[i-1].ts)/60000,s=rows[i-1].state;
+    if(s===16)ps+=dur;else if(s===1024)bd+=dur;else if(s===2048)ms+=dur;else op+=dur;
+  }
+  const ppt=total-ps;
+  const avail=ppt>0?Math.min(100,Math.max(0,(ppt-bd-ms)/ppt*100)):0;
+  const tg=rows[rows.length-1].good-rows[0].good;
+  const tout=tg+(rows[rows.length-1].empty-rows[0].empty)+(rows[rows.length-1].defect-rows[0].defect);
+  const perf=op>0?Math.min(100,Math.max(0,tout/(35*op)*100)):0;
+  const qual=tout>0?Math.min(100,Math.max(0,tg/tout*100)):0;
+  return{avail,perf,qual,oee:avail*perf*qual/10000};
+}
+function calcBDs(rows){
+  const out=[];let inBD=false,s=null,sk='';
+  for(let i=0;i<rows.length;i++){
+    if(rows[i].state===1024&&!inBD){inBD=true;s=rows[i].ts;sk=rows[i].sku;}
+    else if(rows[i].state!==1024&&inBD){out.push({start:s,end:rows[i].ts,sku:sk,dur:(rows[i].ts-s)/60000});inBD=false;}
+  }
+  if(inBD)out.push({start:s,end:rows[rows.length-1].ts,sku:sk,dur:(rows[rows.length-1].ts-s)/60000});
+  return out;
+}
+// Normalise state codes to canonical display state
+// 1 and 256 = Operating; 128 = Minor Stop (yellow); 2 and 512 = Changeover
+function normState(s){ 
+  if([1,256].includes(s)) return 1;    // Operating
+  if([2,512].includes(s)) return 2;    // Changeover
+  return s;                            // 128, 16, 1024, 2048 kept as-is
+}
+
+function stateSegs(rows,a,b){
+  const f=rows.filter(r=>r.ts>=a&&r.ts<=b);
+  if(!f.length)return[];
+  const out=[];
+  let cs=normState(f[0].state), ct=f[0].ts, csku=f[0].sku;
+  for(let i=1;i<f.length;i++){
+    const ns=normState(f[i].state);
+    // Only split if normalised state OR sku changes
+    if(ns!==cs || f[i].sku!==csku){
+      out.push({state:cs,start:ct,end:f[i].ts,sku:csku});
+      cs=ns; ct=f[i].ts; csku=f[i].sku;
+    }
+  }
+  out.push({state:cs,start:ct,end:f[f.length-1].ts,sku:csku});
+  return out;
+}
+function makeWeekRows(){
+  // Use real data if we have multiple dates; otherwise simulate
+  const dates=[...new Set(ROWS.map(r=>localDate(r.ts)))].sort();
+  if(dates.length>1){
+    // Tag each row with its actual date label (e.g. "May 20")
+    return ROWS.map(r=>{
+      const d=localDate(r.ts);
+      const dt=new Date(d+'T00:00:00');
+      const lbl=dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      return{...r,day:lbl,dateStr:d};
+    });
+  }
+  // Single day: simulate across 7 days
+  const base=new Date('2026-05-18'),out=[];
+  for(let d=0;d<7;d++){
+    const f=SEEDS[d],dd=new Date(base);dd.setDate(base.getDate()+d);
+    ROWS.forEach(r=>{
+      const t=new Date(dd);t.setHours(r.ts.getHours(),r.ts.getMinutes(),r.ts.getSeconds());
+      out.push({...r,ts:t,good:Math.round(r.good*f),empty:Math.round(r.empty*f),defect:Math.round(r.defect*f),day:DAYS[d]});
+    });
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CANVAS CHART DRAWING (no library)
+// ═══════════════════════════════════════════════════════
+const _barHits = {};
+
+// Unified canvas hover handler — reads from _barHits[el.id]
+function bindCanvasHover(el) {
+  if (el._hoverBound) return;
+  el._hoverBound = true;
+  el.addEventListener('mousemove', function(e) {
+    const rect = el.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (el.width / rect.width);
+    const my = (e.clientY - rect.top) * (el.height / rect.height);
+    const hits = _barHits[el.id] || [];
+    let found = null;
+    for (const h of hits) { if (mx>=h.x1&&mx<=h.x2&&my>=h.y1&&my<=h.y2){found=h;break;} }
+    const tip = document.getElementById('tip');
+    if (found) {
+      const lines = found.values.filter(v=>v.v>0).map(v=>
+        '<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:'+v.color+';margin-right:6px;vertical-align:middle"></span>'+
+        '<span style="opacity:.7">'+v.name+':</span> <b>'+v.v.toLocaleString()+(v.pct?'%':'')+'</b>'
+      ).join('<br>');
+      const total = found.total!=null ? '<hr style="border:none;border-top:1px solid rgba(255,255,255,.15);margin:5px 0"><span style="opacity:.6">Total: <b>'+found.total.toLocaleString()+'</b></span>' : '';
+      tip.innerHTML = '<div style="font-weight:700;margin-bottom:5px">'+found.label+'</div>'+lines+total;
+      tip.style.display='block';
+      tip.style.left=(e.clientX+14)+'px';
+      tip.style.top=(e.clientY-40)+'px';
+      el.style.cursor='crosshair';
+    } else {
+      tip.style.display='none';
+      el.style.cursor='default';
+    }
+  });
+  el.addEventListener('mouseleave', function() {
+    document.getElementById('tip').style.display='none';
+  });
+}
+
+function drawStackedBar(canvasId, labels, datasets, opts={}) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const W = el.offsetWidth || el.parentElement.offsetWidth || 800;
+  const H = el.offsetHeight || 220;
+  el.width = W; el.height = H;
+  const ctx = el.getContext('2d');
+  const dark = D();
+  const PAD = {top:16, right:16, bottom:36, left:60};
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+  const n = labels.length;
+  const gap = 3;
+  const barW = Math.max(4, (cW - gap*(n+1)) / n);
+  const totals = labels.map((_,i) => datasets.reduce((s,ds)=>s+(ds.data[i]||0),0));
+  const maxV = Math.max(...totals, 1);
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle = dark ? '#334155' : '#e2e8f0';
+  ctx.lineWidth = 1;
+  for (let i=0; i<=4; i++) {
+    const y = PAD.top + cH - (i/4)*cH;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left+cW, y); ctx.stroke();
+    ctx.fillStyle = dark?'#64748b':'#94a3b8';
+    ctx.font = '11px system-ui'; ctx.textAlign = 'right';
+    ctx.fillText(Math.round((i/4)*maxV).toLocaleString(), PAD.left-6, y+4);
+  }
+  const hits = [];
+  _barHits[canvasId] = hits;
+  labels.forEach((lbl, i) => {
+    const x = PAD.left + gap + i*(barW+gap);
+    let stackY = PAD.top + cH;
+    datasets.forEach(ds => {
+      const v = ds.data[i] || 0;
+      if (v <= 0) return;
+      const bH = (v/maxV)*cH;
+      ctx.fillStyle = ds.color;
+      ctx.fillRect(x, stackY-bH, barW, bH);
+      stackY -= bH;
+    });
+    hits.push({x1:x, x2:x+barW, y1:PAD.top, y2:PAD.top+cH,
+      label:lbl, total:totals[i],
+      values:datasets.map(ds=>({name:ds.label,color:ds.color,v:ds.data[i]||0}))});
+    if (n <= 12 || i % 2 === 0) {
+      ctx.fillStyle = dark?'#64748b':'#94a3b8';
+      ctx.font = '10px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(lbl, x+barW/2, PAD.top+cH+16);
+    }
+  });
+  bindCanvasHover(el);
+}
+
+function drawGroupedBar(canvasId, labels, datasets) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const W = el.offsetWidth || el.parentElement.offsetWidth || 800;
+  const H = el.offsetHeight || 240;
+  el.width = W; el.height = H;
+  const ctx = el.getContext('2d');
+  const dark = D();
+  const PAD = {top:16, right:16, bottom:36, left:46};
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+  const n = labels.length, ds = datasets.length;
+  const grpW = cW/n, barW = Math.max(3,(grpW-8)/ds), gap2 = 2;
+  const maxV = Math.max(...datasets.flatMap(d=>d.data), 1);
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle = dark?'#334155':'#e2e8f0';
+  ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=PAD.top+cH-(i/4)*cH;
+    ctx.beginPath();ctx.moveTo(PAD.left,y);ctx.lineTo(PAD.left+cW,y);ctx.stroke();
+    ctx.fillStyle=dark?'#64748b':'#94a3b8';
+    ctx.font='11px system-ui';ctx.textAlign='right';
+    ctx.fillText(Math.round(i/4*maxV)+'%',PAD.left-4,y+4);
+  }
+  const hits=[];
+  _barHits[canvasId]=hits;
+  labels.forEach((lbl,i)=>{
+    const gx=PAD.left+i*grpW+4;
+    const grpHits={label:lbl, values:[]};
+    datasets.forEach((d,j)=>{
+      const v=d.data[i]||0,bH=(v/maxV)*cH;
+      const bx=gx+j*(barW+gap2);
+      ctx.fillStyle=d.color;
+      ctx.fillRect(bx,PAD.top+cH-bH,barW,bH);
+      grpHits.values.push({name:d.label,color:d.color,v});
+    });
+    hits.push({x1:PAD.left+i*grpW, x2:PAD.left+(i+1)*grpW,
+               y1:PAD.top, y2:PAD.top+cH,
+               label:lbl, values:grpHits.values, total:null});
+    ctx.fillStyle=dark?'#64748b':'#94a3b8';
+    ctx.font='11px system-ui';ctx.textAlign='center';
+    ctx.fillText(lbl,PAD.left+i*grpW+grpW/2,PAD.top+cH+16);
+  });
+  // legend
+  let lx=PAD.left;
+  datasets.forEach(d=>{
+    ctx.fillStyle=d.color; ctx.fillRect(lx,6,10,10);
+    ctx.fillStyle=dark?'#94a3b8':'#64748b';
+    ctx.font='11px system-ui';ctx.textAlign='left';
+    ctx.fillText(d.label,lx+14,16);
+    lx+=ctx.measureText(d.label).width+30;
+  });
+  bindCanvasHover(el);
+}
+
+function drawWaterfall(canvasId, oee) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const W = el.offsetWidth || el.parentElement.offsetWidth || 800;
+  const H = el.offsetHeight || 200;
+  el.width = W; el.height = H;
+  const ctx = el.getContext('2d');
+  const dark = D();
+  const PAD={top:16,right:16,bottom:36,left:48};
+  const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
+  const {avail,perf,qual,oee:ov}=oee;
+  const aL=+(100-avail).toFixed(1);
+  const pL=+(avail-avail*perf/100).toFixed(1);
+  const qL=+(avail*perf/100-ov).toFixed(1);
+  const bars=[
+    {lbl:'Available',base:0,h:100,c:'#3b82f6'},
+    {lbl:'Avail Loss',base:+(100-aL).toFixed(1),h:aL,c:'#ef4444'},
+    {lbl:'Perf Loss',base:+(avail-pL).toFixed(1),h:pL,c:'#f97316'},
+    {lbl:'Qual Loss',base:+(avail*perf/100-qL).toFixed(1),h:qL,c:'#f59e0b'},
+    {lbl:'OEE',base:0,h:+ov.toFixed(1),c:ov>=65?'#22c55e':ov>=45?'#f59e0b':'#ef4444'},
+  ];
+  ctx.clearRect(0,0,W,H);
+  const n=bars.length, barW=Math.min(80,(cW-n*8)/n);
+  ctx.strokeStyle=dark?'#334155':'#e2e8f0'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=PAD.top+cH-(i/4)*cH;
+    ctx.beginPath();ctx.moveTo(PAD.left,y);ctx.lineTo(PAD.left+cW,y);ctx.stroke();
+    ctx.fillStyle=dark?'#64748b':'#94a3b8';ctx.font='11px system-ui';ctx.textAlign='right';
+    ctx.fillText((i/4*100).toFixed(0)+'%',PAD.left-4,y+4);
+  }
+  const hits=[];
+  _barHits[canvasId]=hits;
+  bars.forEach((b,i)=>{
+    const x=PAD.left+i*(cW/n)+(cW/n-barW)/2;
+    const by=PAD.top+cH-(b.base+b.h)/100*cH;
+    const bh=b.h/100*cH;
+    ctx.fillStyle=b.c; ctx.fillRect(x,by,barW,Math.max(2,bh));
+    ctx.fillStyle=dark?'#e2e8f0':'#0f172a';
+    ctx.font='bold 11px system-ui';ctx.textAlign='center';
+    if(bh>16)ctx.fillText(b.h.toFixed(1)+'%',x+barW/2,by+bh/2+4);
+    ctx.fillStyle=dark?'#64748b':'#94a3b8';
+    ctx.font='11px system-ui';
+    ctx.fillText(b.lbl,x+barW/2,PAD.top+cH+16);
+    hits.push({x1:x,x2:x+barW,y1:PAD.top,y2:PAD.top+cH,
+               label:b.lbl,
+               values:[{name:b.lbl,color:b.c,v:b.h,pct:true}],
+               total:null});
+  });
+  bindCanvasHover(el);
+}
+
+function drawPareto(canvasId, pareto) {
+  const el = document.getElementById(canvasId);
+  if(!el) return;
+  const W=el.offsetWidth||el.parentElement.offsetWidth||800;
+  const H=el.offsetHeight||260;
+  el.width=W; el.height=H;
+  const ctx=el.getContext('2d');
+  const dark=D();
+  const PAD={top:20,right:56,bottom:36,left:52};
+  const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
+  const n=pareto.length;
+  const maxV=pareto[0]?pareto[0].val:1;
+  const barW=Math.max(20,(cW-n*4)/n);
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle=dark?'#334155':'#e2e8f0'; ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=PAD.top+cH-(i/4)*cH;
+    ctx.beginPath();ctx.moveTo(PAD.left,y);ctx.lineTo(PAD.left+cW,y);ctx.stroke();
+    ctx.fillStyle=dark?'#64748b':'#94a3b8';ctx.font='11px system-ui';ctx.textAlign='right';
+    ctx.fillText(Math.round(i/4*maxV).toLocaleString(),PAD.left-4,y+4);
+  }
+  // bars
+  const hits=[];
+  _barHits[canvasId]=hits;
+  pareto.forEach((p,i)=>{
+    const x=PAD.left+i*(cW/n)+(cW/n-barW)/2;
+    const bh=(p.val/maxV)*cH;
+    ctx.fillStyle='#0ea5e9';
+    ctx.fillRect(x,PAD.top+cH-bh,barW,bh);
+    ctx.fillStyle=dark?'#64748b':'#94a3b8';ctx.font='11px system-ui';ctx.textAlign='center';
+    ctx.fillText(p.sku,x+barW/2,PAD.top+cH+16);
+    hits.push({x1:x,x2:x+barW,y1:PAD.top,y2:PAD.top+cH,
+               label:p.sku,
+               values:[{name:'Good Bags',color:'#0ea5e9',v:p.val},
+                       {name:'Cumulative',color:'#ef4444',v:p.cp,pct:true}],
+               total:null});
+  });
+  // cumulative line
+  ctx.strokeStyle='#ef4444'; ctx.lineWidth=2; ctx.beginPath();
+  pareto.forEach((p,i)=>{
+    const x=PAD.left+i*(cW/n)+cW/n/2;
+    const y=PAD.top+cH-(p.cp/100)*cH;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); if(i===0)ctx.moveTo(x,y);else{ctx.moveTo(pareto[i-1]?PAD.left+(i-1)*(cW/n)+cW/n/2:x,PAD.top+cH-(pareto[i-1]?pareto[i-1].cp:p.cp)/100*cH);ctx.lineTo(x,y);}
+    ctx.stroke();
+  });
+  // 80% line on right axis
+  const y80=PAD.top+cH-0.8*cH;
+  ctx.setLineDash([6,4]); ctx.strokeStyle='#ef4444'; ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(PAD.left,y80);ctx.lineTo(PAD.left+cW,y80);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#ef4444';ctx.font='11px system-ui';ctx.textAlign='left';
+  ctx.fillText('80%',PAD.left+cW+4,y80+4);
+  // right axis labels
+  for(let i=0;i<=4;i++){
+    const y=PAD.top+cH-(i/4)*cH;
+    ctx.fillStyle=dark?'#64748b':'#94a3b8';ctx.font='11px system-ui';ctx.textAlign='left';
+    ctx.fillText((i*25)+'%',PAD.left+cW+4,y+4);
+  }
+  bindCanvasHover(el);
+}
+
+// ═══════════════════════════════════════════════════════
+//  HTML BUILDERS
+// ═══════════════════════════════════════════════════════
+function card(html){return`<div class="card">${html}</div>`;}
+function sh(t){return`<div class="sh"><div class="sb"></div><span class="st">${t}</span></div>`;}
+function ld(c,l){return`<span class="li"><span class="ld" style="background:${c}"></span>${l}</span>`;}
+function kpi(l,v,c){return`<div class="kcard"><div class="kl">${l}</div><div class="kv" style="color:${c}">${v}%</div></div>`;}
+// Canvas: fixed pixel dimensions set explicitly so the element has real size before draw
+function cvs(id,h){return`<canvas id="${id}" width="800" height="${h}" style="width:100%;height:${h}px;display:block;"></canvas>`;}
+
+function skuTable(runs){
+  const tot=runs.reduce((a,r)=>({g:a.g+r.good,e:a.e+r.empty,d:a.d+r.defect,m:a.m+r.dur}),{g:0,e:0,d:0,m:0});
+  return`<div class="scroll"><table>
+    <thead><tr><th>SKU</th><th>Start</th><th>End</th><th>Duration</th><th>Good</th><th>Empty</th><th>Defect</th></tr></thead>
+    <tbody>${runs.map(r=>`<tr>
+      <td style="color:#3b82f6;font-weight:600">${r.sku}</td>
+      <td>${fT(r.start)}</td><td>${fT(r.end)}</td><td>${fDur(r.dur)}</td>
+      <td>${r.good.toLocaleString()}</td>
+      <td style="color:#f59e0b">${r.empty.toLocaleString()}</td>
+      <td style="color:#ef4444">${r.defect.toLocaleString()}</td>
+    </tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">TOTAL</td><td>${fDur(tot.m)}</td>
+      <td>${tot.g.toLocaleString()}</td>
+      <td style="color:#f59e0b">${tot.e.toLocaleString()}</td>
+      <td style="color:#ef4444">${tot.d.toLocaleString()}</td></tr></tfoot>
+  </table></div>`;
+}
+function bdTable(bds){
+  if(!bds.length)return`<p class="nodata">No breakdowns recorded.</p>`;
+  return`<div class="scroll"><table>
+    <thead><tr><th>#</th><th>Start</th><th>End</th><th>Duration</th><th style="width:45%">Notes <span style="font-weight:400;opacity:.45;font-size:10px;text-transform:none;letter-spacing:0">(click to add context)</span></th></tr></thead>
+    <tbody>${bds.map((b,i)=>{
+      const s=Math.round(b.dur*60),mm=Math.floor(s/60),ss=s%60;
+      const dur=`${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+      const key=bdKey(b);
+      const safeKey=key.replace(/[^a-z0-9]/gi,'_');
+      const existing=(bdNotes[key]||'').replace(/"/g,'&quot;');
+      return`<tr>
+        <td style="opacity:.5">${i+1}</td>
+        <td>${fT(b.start)}</td>
+        <td>${fT(b.end)}</td>
+        <td style="color:#dc2626;font-weight:600;white-space:nowrap">${dur}</td>
+        <td>
+          <textarea class="bd-note" rows="1"
+            placeholder="e.g. jam on conveyor belt, awaiting parts..."
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+            onchange="saveBdNote('${key}',this.value)"
+          >${existing}</textarea>
+          <span class="bd-saved" id="saved_${safeKey}">✓ saved</span>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+function ganttBlock(rows,date){
+  const shifts=[
+    {lbl:'00:00–08:00',a:new Date(date+' 00:00:00'),b:new Date(date+' 08:00:00')},
+    {lbl:'08:00–16:00',a:new Date(date+' 08:00:00'),b:new Date(date+' 16:00:00')},
+    (()=>{const eod=new Date(date+' 16:00:00');eod.setHours(23,59,59,999);return{lbl:'16:00–24:00',a:new Date(date+' 16:00:00'),b:eod};})(),
+  ];
+  const html = shifts.map((sh,si)=>{
+    const segs=stateSegs(rows,sh.a,sh.b);
+    const shDur=(sh.b-sh.a)/60000;
+    const divs=segs.map(seg=>{
+      const off=(seg.start-sh.a)/60000,dur=(seg.end-seg.start)/60000;
+      if(dur<=0)return'';
+      const x=(off/shDur)*100,w=Math.max(.2,(dur/shDur)*100);
+      const{n,c}=sInfo(seg.state);
+      // Store tooltip data as data-attributes — no inline HTML quoting issues
+      const dsku = (seg.state===1 && seg.sku) ? seg.sku : '';
+      const dstate = n;
+      const dtime  = fT(seg.start)+' – '+fT(seg.end);
+      const ddur   = Math.round(dur)+' min';
+      // Mark editable states (Breakdown=1024, Changeover=2, PlannedStop=16)
+      const editable=[1024,2,16].includes(seg.state);
+      const segIdx=ROWS.findIndex(r=>r.ts>=seg.start&&r.ts<seg.end&&normState(r.state)===seg.state);
+      return`<div class="gseg${editable?' editable':''}"
+        style="left:${x}%;width:${w}%;background:${c}"
+        data-sku="${dsku}"
+        data-state="${dstate}"
+        data-time="${dtime}"
+        data-dur="${ddur}"
+        data-seg-start="${seg.start.getTime()}"
+        data-seg-end="${seg.end.getTime()}"
+        data-seg-state="${seg.state}"
+        onmouseleave="hideTip()"
+        ${editable?`onclick="openSegPopup(event,this)"`:''}>
+      </div>`;
+    }).join('');
+    const cid='spd_'+date.replace(/-/g,'')+'_'+si;
+    return`<div class="gantt-block">
+      <div class="gantt-row"><div class="glbl">${sh.lbl}</div><div class="gtrack">${divs}</div></div>
+      <div class="speed-row"><div class="speed-lbl">speed</div><div class="speed-canvas-wrap"><canvas id="${cid}" width="800" height="36" style="width:100%;height:36px;display:block;"></canvas></div></div>
+    </div>`;
+  }).join('');
+  // Schedule sparkline drawing after DOM update
+  setTimeout(()=>shifts.forEach((sh,si)=>{
+    const cid='spd_'+date.replace(/-/g,'')+'_'+si;
+    drawSpeedSparkline(cid, rows, sh.a, sh.b);
+  }),0);
+  return html;
+}
+
+function drawSpeedSparkline(canvasId, rows, shiftStart, shiftEnd){
+  const el=document.getElementById(canvasId);
+  if(!el)return;
+  const W=el.offsetWidth||el.parentElement.offsetWidth||800;
+  const H=36;
+  el.width=W; el.height=H;
+  const ctx=el.getContext('2d');
+  const dark=D();
+  // Filter rows in this shift window
+  const pts=rows.filter(r=>r.ts>=shiftStart&&r.ts<=shiftEnd);
+  if(pts.length<2){ctx.clearRect(0,0,W,H);return;}
+  const shDurMs=shiftEnd-shiftStart;
+  const maxSpeed=Math.max(...pts.map(p=>p.speed),1);
+  const PAD={top:4,bottom:4,left:0,right:0};
+  const cW=W-PAD.left-PAD.right;
+  const cH=H-PAD.top-PAD.bottom;
+  ctx.clearRect(0,0,W,H);
+  // Baseline
+  ctx.strokeStyle=dark?'#1e3a2a':'#d1fae5';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(PAD.left,PAD.top+cH);
+  ctx.lineTo(PAD.left+cW,PAD.top+cH);
+  ctx.stroke();
+  // Fill under line
+  const grad=ctx.createLinearGradient(0,PAD.top,0,PAD.top+cH);
+  grad.addColorStop(0,'rgba(34,197,94,0.35)');
+  grad.addColorStop(1,'rgba(34,197,94,0.02)');
+  ctx.fillStyle=grad;
+  ctx.beginPath();
+  pts.forEach((p,i)=>{
+    const x=PAD.left+((p.ts-shiftStart)/shDurMs)*cW;
+    const y=PAD.top+cH-(p.speed/maxSpeed)*cH;
+    i===0?ctx.moveTo(x,PAD.top+cH):0;
+    ctx.lineTo(x,y);
+  });
+  const lastX=PAD.left+((pts[pts.length-1].ts-shiftStart)/shDurMs)*cW;
+  ctx.lineTo(lastX,PAD.top+cH);
+  ctx.closePath();
+  ctx.fill();
+  // Line
+  ctx.strokeStyle='#22c55e';
+  ctx.lineWidth=1.5;
+  ctx.lineJoin='round';
+  ctx.beginPath();
+  pts.forEach((p,i)=>{
+    const x=PAD.left+((p.ts-shiftStart)/shDurMs)*cW;
+    const y=PAD.top+cH-(p.speed/maxSpeed)*cH;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // Max speed label top-right
+  ctx.fillStyle=dark?'#4ade80':'#16a34a';
+  ctx.font='9px system-ui';
+  ctx.textAlign='right';
+  ctx.fillText(maxSpeed+' bg/m',W-2,10);
+  // Zero label
+  ctx.fillStyle=dark?'#334155':'#94a3b8';
+  ctx.fillText('0',W-2,H-2);
+  // Hover: show speed value on mousemove
+  if(!el._speedBound){
+    el._speedBound=true;
+    el.addEventListener('mousemove',function(e){
+      const rect=el.getBoundingClientRect();
+      const mx=(e.clientX-rect.left)*(el.width/rect.width);
+      const tAtMouse=new Date(shiftStart.getTime()+((mx/W)*shDurMs));
+      // Find closest point
+      let best=pts[0],bestDist=Infinity;
+      for(const p of pts){const d=Math.abs(p.ts-tAtMouse);if(d<bestDist){bestDist=d;best=p;}}
+      showTip(e,'Speed: <b>'+best.speed+' bg/min</b><br>'+fT(best.ts));
+    });
+    el.addEventListener('mouseleave',hideTip);
+  }
+}
+
+function showTip(e,html){
+  const t=document.getElementById('tip');
+  t.innerHTML=html; t.style.display='block';
+  t.style.left=(e.clientX+14)+'px'; t.style.top=(e.clientY-40)+'px';
+}
+function hideTip(){document.getElementById('tip').style.display='none';}
+document.addEventListener('mousemove',e=>{
+  const t=document.getElementById('tip');
+  // Always track tip position
+  if(t.style.display==='block'){t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY-40)+'px';}
+  // Gantt segment hover via data-attributes
+  const seg=e.target.closest('.gseg[data-state]');
+  if(seg){
+    const sku=seg.dataset.sku,state=seg.dataset.state,time=seg.dataset.time,dur=seg.dataset.dur;
+    let inner='';
+    if(sku) inner+=`<span style="display:inline-block;background:#1e40af;color:#bfdbfe;padding:2px 9px;border-radius:4px;font-weight:700;font-size:13px;margin-bottom:4px">${sku}</span><br>`;
+    inner+=`<b>${state}</b><br>${time}<br>${dur}`;
+    t.innerHTML=inner; t.style.display='block';
+  } else if(!e.target.closest('canvas')) {
+    // Only hide if not over any canvas (canvases handle their own tips)
+    hideTip();
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+//  STATE & RENDER
+// ═══════════════════════════════════════════════════════
+let VIEW='live', SEL='2026-05-20';
+let _WR=null;
+function WR(){return _WR||(_WR=makeWeekRows());}
+
+// Breakdown notes — keyed by "date_startTime" e.g. "2026-05-20_16:47"
+const bdNotes={};
+function bdKey(b){return localDate(b.start)+'_'+fT(b.start);}
+function saveBdNote(key,val){
+  bdNotes[key]=val;
+  // flash saved indicator
+  const el=document.getElementById('saved_'+key.replace(/[^a-z0-9]/gi,'_'));
+  if(el){el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1500);}
+}
+
+function setView(v){
+  VIEW=v;
+  document.querySelectorAll('.ctrls .btn').forEach(b=>b.classList.remove('on'));
+  const id = v==='live'?'bL':v==='daily'?'bD':'bW';
+  const b = document.getElementById(id); if(b) b.classList.add('on');
+  if(v==='live') render();
+  else if(v==='daily') loadDay(SEL);
+  else loadWeek(SEL);
+}
+function exportPDF(){
+  // Update PDF header info
+  const subtitle = document.getElementById('pdf-subtitle');
+  const pdfDate  = document.getElementById('pdf-date');
+  if(subtitle) subtitle.textContent = VIEW==='daily'
+    ? 'Daily Report — ' + SEL
+    : 'Weekly Report — ' + ([...new Set(ROWS.map(r=>localDate(r.ts)))].sort().join(' to '));
+  if(pdfDate) pdfDate.textContent = 'Exported: ' + new Date().toLocaleString();
+
+  // Resize all canvases to their actual pixel size before printing
+  // (prevents blank canvas in PDF)
+  document.querySelectorAll('canvas').forEach(c=>{
+    const rect = c.getBoundingClientRect();
+    if(rect.width>0 && c.width !== Math.round(rect.width)){
+      c.width  = Math.round(rect.width);
+      c.height = Math.round(rect.height);
+    }
+  });
+
+  // Trigger re-render so canvases are fresh at print size
+  render();
+  setTimeout(()=>{ window.print(); }, 300);
+}
+
+// ── Gantt Segment Edit ────────────────────────────────────────────────────
+let _editSeg = null; // {start, end, state, el}
+
+function openSegPopup(e, el) {
+  e.stopPropagation();
+  hideTip();
+  const segStart = new Date(+el.dataset.segStart);
+  const segEnd   = new Date(+el.dataset.segEnd);
+  const segState = +el.dataset.segState;
+  _editSeg = {start: segStart, end: segEnd, state: segState, el};
+
+  // Update popup label
+  const {n} = sInfo(segState);
+  document.getElementById('popup-cur-label').textContent =
+    n + '  ' + fT(segStart) + ' – ' + fT(segEnd);
+
+  // Init split controls — duration in minutes
+  const totalMins = Math.round((segEnd - segStart) / 60000);
+  const halfMins  = Math.round(totalMins / 2);
+  const minsInput  = document.getElementById('split-mins');
+  const slider     = document.getElementById('split-slider');
+  const sliderMid  = document.getElementById('split-slider-mid');
+  const sliderMax  = document.getElementById('split-slider-max');
+  const splitOf    = document.getElementById('split-of');
+  if(minsInput)  { minsInput.value = halfMins; minsInput.max = totalMins-1; }
+  if(slider)     { slider.max = totalMins-1; slider.value = halfMins; }
+  if(sliderMid)  sliderMid.textContent = halfMins;
+  if(sliderMax)  sliderMax.textContent = totalMins-1;
+  if(splitOf)    splitOf.textContent   = 'of ' + totalMins + ' min total';
+  document.getElementById('split-error').style.display='none';
+
+  // Hide reclassify buttons for current state
+  document.querySelectorAll('#seg-popup .popup-btn[onclick*="reclassifySeg"]').forEach(b=>{
+    const bState = +b.getAttribute('onclick').match(/\d+/)[0];
+    b.style.display = (normState(bState)===normState(segState)||bState===segState) ? 'none' : 'flex';
+  });
+
+  // Position popup near click, keep inside viewport
+  const popup = document.getElementById('seg-popup');
+  popup.style.display = 'block';
+  const pw=popup.offsetWidth||220, ph=popup.offsetHeight||200;
+  let px = e.clientX+10, py = e.clientY+10;
+  if(px+pw > window.innerWidth-10)  px = e.clientX-pw-10;
+  if(py+ph > window.innerHeight-10) py = e.clientY-ph-10;
+  popup.style.left = px+'px';
+  popup.style.top  = py+'px';
+}
+
+function closeSegPopup(){
+  document.getElementById('seg-popup').style.display='none';
+  _editSeg=null;
+}
+
+function onSplitSlider(val){
+  const m=document.getElementById('split-mins');
+  if(m) m.value=val;
+}
+
+function reclassifySeg(newState){
+  if(!_editSeg)return;
+  const {start, end} = _editSeg;
+  // Update all ROWS in [start, end)
+  ROWS.forEach(r=>{ if(r.ts>=start && r.ts<end) r.state=newState; });
+  closeSegPopup();
+  _WR=null;
+  renderDaily();
+}
+
+function splitSeg(){
+  if(!_editSeg)return;
+  const {start, end, state} = _editSeg;
+  const errEl = document.getElementById('split-error');
+  const minsVal = parseInt(document.getElementById('split-mins').value, 10);
+  const totalMins = Math.round((end - start) / 60000);
+
+  if(isNaN(minsVal)||minsVal<1){
+    errEl.textContent='Please enter the first-part duration in minutes.';
+    errEl.style.display='block'; return;
+  }
+  if(minsVal>=totalMins){
+    errEl.textContent='Duration must be less than '+totalMins+' min (total segment length).';
+    errEl.style.display='block'; return;
+  }
+  errEl.style.display='none';
+
+  // Compute split timestamp = start + minsVal minutes
+  const splitTs = new Date(start.getTime() + minsVal*60000);
+
+  // Ensure there's a row at or near splitTs — insert synthetic if needed
+  const exactRow = ROWS.find(r=>r.ts.getTime()===splitTs.getTime());
+  if(!exactRow){
+    // Clone nearest previous row as anchor for the split boundary
+    const prevRows = ROWS.filter(r=>r.ts>=start&&r.ts<splitTs);
+    if(!prevRows.length){ errEl.textContent='No data before split point.'; errEl.style.display='block'; return; }
+    const refRow = prevRows[prevRows.length-1];
+    ROWS.push({...refRow, ts: new Date(splitTs), state: 1024});
+    ROWS.sort((a,b)=>a.ts-b.ts);
+  } else {
+    exactRow.state = 1024;
+  }
+
+  // Mark second half (splitTs → end) as Breakdown
+  ROWS.forEach(r=>{ if(r.ts>=splitTs && r.ts<end) r.state=1024; });
+
+  closeSegPopup();
+  _WR=null;
+  renderDaily();
+}
+
+// Close popup on outside click
+document.addEventListener('click', e=>{
+  const popup=document.getElementById('seg-popup');
+  if(popup&&popup.style.display==='block'&&!popup.contains(e.target)&&!e.target.closest('.gseg.editable')){
+    closeSegPopup();
+  }
+});
+
+function toggleTheme(){
+  const d=document.body.classList.toggle('dark');
+  document.body.classList.toggle('light',!d);
+  render();
+}
+let DAYS_AVAIL = [];   // available date folders, from /api/days
+
+function clampDay(ds){
+  const min=DAYS_AVAIL[0], max=DAYS_AVAIL[DAYS_AVAIL.length-1];
+  if(min && ds<min) return min;
+  if(max && ds>max) return max;
+  return ds;
+}
+function selDate(d){ SEL=clampDay(d); if(VIEW==='weekly') loadWeek(SEL); else loadDay(SEL); }
+function stepDay(n){ const dt=new Date(SEL+'T00:00:00'); dt.setDate(dt.getDate()+n); selDate(localDate(dt)); }
+function stepWeek(n){ const dt=new Date(SEL+'T00:00:00'); dt.setDate(dt.getDate()+7*n); selDate(localDate(dt)); }
+
+function dateInput(){
+  const min=DAYS_AVAIL[0]||SEL, max=DAYS_AVAIL[DAYS_AVAIL.length-1]||SEL;
+  return `<input type="date" value="${SEL}" min="${min}" max="${max}" onchange="selDate(this.value)"
+    style="background:rgba(127,127,127,.1);border:1px solid rgba(127,127,127,.25);color:inherit;border-radius:8px;padding:5px 9px;font-size:13px;font-family:inherit">`;
+}
+function dateSelector(){
+  return `<div class="dates" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span class="dlbl">Day:</span>
+    <button class="date-btn" onclick="stepDay(-1)" title="Previous day">◀</button>
+    ${dateInput()}
+    <button class="date-btn" onclick="stepDay(1)" title="Next day">▶</button>
+  </div>`;
+}
+function weekSelector(){
+  const end=new Date(SEL+'T00:00:00'), start=new Date(end); start.setDate(end.getDate()-6);
+  const fmt=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  return `<div class="dates" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span class="dlbl">Week ending:</span>
+    <button class="date-btn" onclick="stepWeek(-1)" title="Previous week">◀</button>
+    ${dateInput()}
+    <button class="date-btn" onclick="stepWeek(1)" title="Next week">▶</button>
+    <span style="opacity:.55;font-size:12px;margin-left:4px">${fmt(start)} – ${fmt(end)}</span>
+  </div>`;
+}
+
+async function loadDays(){
+  try{ const r=await fetch('/api/days',{cache:'no-store'}); if(r.ok){ const j=await r.json(); if(Array.isArray(j)) DAYS_AVAIL=j; } }catch(e){}
+  if(!DAYS_AVAIL.length){ DAYS_AVAIL=[...new Set(parseCSVText(FALLBACK).map(r=>localDate(r.ts)))].sort(); }  // offline preview
+  if(DAYS_AVAIL.length && !_histBootstrapped){ SEL=DAYS_AVAIL[DAYS_AVAIL.length-1]; _histBootstrapped=true; }
+}
+async function loadDay(date){
+  let text=null;
+  try{ const r=await fetch('/api/rows?date='+date,{cache:'no-store'}); if(r.ok) text=await r.text(); }catch(e){}
+  const parsed = text!=null ? parseCSVText(text)
+                            : parseCSVText(FALLBACK).filter(r=>localDate(r.ts)===date);  // offline
+  parsed.sort((a,b)=>a.ts-b.ts);
+  ROWS=parsed; _WR=null; SEL=date;
+  renderDaily();
+}
+async function loadWeek(endDate){
+  const end=new Date(endDate+'T00:00:00'), start=new Date(end); start.setDate(end.getDate()-6);
+  const frm=localDate(start), to=localDate(end);
+  let text=null;
+  try{ const r=await fetch(`/api/rows?from=${frm}&to=${to}`,{cache:'no-store'}); if(r.ok) text=await r.text(); }catch(e){}
+  const parsed = text!=null ? parseCSVText(text) : parseCSVText(FALLBACK);  // offline
+  parsed.sort((a,b)=>a.ts-b.ts);
+  ROWS=parsed; _WR=null; SEL=endDate;
+  renderWeekly();
+}
+function render(){ if(VIEW==='live'){renderLive();return;} VIEW==='daily'?renderDaily():renderWeekly(); }
+
+function renderDaily(){
+  if(!ROWS||!ROWS.length){document.getElementById('main').innerHTML='<div style="padding:40px;text-align:center;opacity:.4;font-size:14px">No saved data for this day yet. Rows appear once the line has been running.</div>';return;}
+  const dr=ROWS.filter(r=>localDate(r.ts)===SEL);
+  const runs=skuRuns(dr), hourly=hourlyBars(dr), oee=calcOEE(dr), bds=calcBDs(dr);
+  const oc=oee.oee>=65?'#22c55e':oee.oee>=45?'#f59e0b':'#ef4444';
+  const dates=[...new Set(ROWS.map(r=>localDate(r.ts)))].sort();
+  const dark=D();
+
+  document.getElementById('main').innerHTML=`
+    ${dateSelector()}
+    ${card(sh('SKU Timeline')+skuTable(runs))}
+    ${card(sh('Machine Status — Gantt')+ganttBlock(dr,SEL)+
+      `<div class="leg" style="margin-top:10px">
+        ${ld('#22c55e','Operating')}${ld('#f59e0b','Changeover')}${ld('#3b82f6','Planned Stop')}
+        ${ld('#a855f7','Minor Stop')}${ld('#dc2626','Breakdown')}
+      </div>`)}
+    ${card(sh('Production Counters — Hourly')+
+      `<div class="leg">${ld('#22c55e','Good Bags')}${ld('#f59e0b','Empty Bags')}${ld('#ef4444','Defect Bags')}</div>`+
+      cvs('cH',220))}
+    ${card(sh('OEE Analysis')+
+      `<div class="kgrid">
+        ${kpi('Availability',oee.avail.toFixed(1),'#3b82f6')}
+        ${kpi('Performance',oee.perf.toFixed(1),'#f59e0b')}
+        ${kpi('Quality',oee.qual.toFixed(1),'#22c55e')}
+        ${kpi('OEE',oee.oee.toFixed(1),oc)}
+      </div>`+cvs('cOEE',200))}
+    ${card(sh('Breakdown Log')+bdTable(bds))}
+  `;
+
+  // Draw after DOM is settled
+  requestAnimationFrame(()=>{
+    const h=hourlyBars(dr);
+    drawStackedBar('cH',h.map(x=>String(x.h).padStart(2,'0')+':00'),[
+      {label:'Good',color:'#22c55e',data:h.map(x=>x.g)},
+      {label:'Empty',color:'#f59e0b',data:h.map(x=>x.e)},
+      {label:'Defect',color:'#ef4444',data:h.map(x=>x.d)},
+    ]);
+    drawWaterfall('cOEE',oee);
+  });
+}
+
+function renderWeekly(){
+  const wr=WR();
+  const allDays=[...new Set(wr.map(r=>r.day))]; // dynamic labels from actual data
+  const isReal=allDays.length>1&&wr[0]&&wr[0].dateStr;
+  const daily=allDays.map(day=>{
+    const dr=wr.filter(r=>r.day===day).sort((a,b)=>a.ts-b.ts);
+    let g=0,e=0,d=0;
+    for(let i=1;i<dr.length;i++){g+=Math.max(0,dr[i].good-dr[i-1].good);e+=Math.max(0,dr[i].empty-dr[i-1].empty);d+=Math.max(0,dr[i].defect-dr[i-1].defect);}
+    const o=calcOEE(dr);
+    return{day,g,e,d,avail:+o.avail.toFixed(1),perf:+o.perf.toFixed(1),qual:+o.qual.toFixed(1),oee:+o.oee.toFixed(1)};
+  });
+  const skuMap={};
+  wr.forEach((r,i,a)=>{if(i===0)return;const diff=Math.max(0,r.good-a[i-1].good);if(!skuMap[r.sku])skuMap[r.sku]=0;skuMap[r.sku]+=diff;});
+  const pSorted=Object.entries(skuMap).sort((a,b)=>b[1]-a[1]);
+  const pTotal=pSorted.reduce((s,[,v])=>s+v,0); let cum=0;
+  const pareto=pSorted.map(([sku,val])=>{cum+=val;return{sku,val,cp:+(cum/pTotal*100).toFixed(1)};});
+  const wskuMap={};
+  allDays.forEach(day=>{
+    const dr=wr.filter(r=>r.day===day).sort((a,b)=>a.ts-b.ts);
+    skuRuns(dr).forEach(r=>{const k=day+'_'+r.sku;if(!wskuMap[k])wskuMap[k]={day,sku:r.sku,good:0,empty:0,defect:0,dur:0};wskuMap[k].good+=r.good;wskuMap[k].empty+=r.empty;wskuMap[k].defect+=r.defect;wskuMap[k].dur+=r.dur;});
+  });
+  const wskus=Object.values(wskuMap);
+  const wbds=[];
+  allDays.forEach(day=>{const dr=wr.filter(r=>r.day===day).sort((a,b)=>a.ts-b.ts);calcBDs(dr).forEach(b=>wbds.push({...b,day}));});
+
+  document.getElementById('main').innerHTML=`
+    ${weekSelector()}
+    ${!isReal ? '<div class="warn">⚠️ Weekly view simulated from single-day data with ±8% variation.</div>' : ''}
+    ${card(sh('SKU Summary by Day')+`<div class="scroll"><table>
+      <thead><tr><th>Day</th><th>SKU</th><th>Good Bags</th><th>Empty</th><th>Defect</th><th>Run Time</th></tr></thead>
+      <tbody>${wskus.map(r=>`<tr>
+        <td style="font-weight:600">${r.day}</td><td style="color:#3b82f6;font-weight:600">${r.sku}</td>
+        <td>${r.good.toLocaleString()}</td><td style="color:#f59e0b">${r.empty.toLocaleString()}</td>
+        <td style="color:#ef4444">${r.defect.toLocaleString()}</td><td>${fDur(r.dur)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`)}
+    ${card(sh('Production Counters — Daily')+
+      `<div class="leg">${ld('#22c55e','Good Bags')}${ld('#f59e0b','Empty Bags')}${ld('#ef4444','Defect Bags')}</div>`+cvs('cDaily',240))}
+    ${card(sh('OEE by Day')+cvs('cDOEE',240))}
+    ${card(sh('Pareto — Good Production by SKU')+cvs('cPareto',260))}
+    ${card(sh('Breakdown Log — Full Week')+bdTable(wbds))}
+  `;
+
+  requestAnimationFrame(()=>{
+    drawStackedBar('cDaily',allDays,[
+      {label:'Good',color:'#22c55e',data:daily.map(x=>x.g)},
+      {label:'Empty',color:'#f59e0b',data:daily.map(x=>x.e)},
+      {label:'Defect',color:'#ef4444',data:daily.map(x=>x.d)},
+    ]);
+    drawGroupedBar('cDOEE',allDays,[
+      {label:'Availability',color:'#3b82f6',data:daily.map(x=>x.avail)},
+      {label:'Performance',color:'#f59e0b',data:daily.map(x=>x.perf)},
+      {label:'Quality',color:'#22c55e',data:daily.map(x=>x.qual)},
+      {label:'OEE',color:'#8b5cf6',data:daily.map(x=>x.oee)},
+    ]);
+    drawPareto('cPareto',pareto);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  LIVE VIEW  — real-time tiles + rolling speed chart
+//  Data: /api/live (current values) and /api/rows (per-day CSVs on disk)
+// ═══════════════════════════════════════════════════════
+const POLL_MS = 2000;          // live refresh rate
+const WINDOW_SAMPLES = 150;    // 150 × 2s = 5 min of trend
+const STATE_LABELS = { 0:"Stopped", 128:"Idle", 256:"Running" };  // edit to match Tag_86
+
+let _buf = [];                 // [{t, speed}]
+let _lastLive = null;
+let _everLive = false;
+let _demo = null;
+let _histBootstrapped = false;
+
+function setLiveStatus(kind){
+  const c = {connecting:"#9ca3af",live:"#22c55e",stale:"#f59e0b",offline:"#ef4444",demo:"#38bdf8"}[kind]||"#9ca3af";
+  const t = {connecting:"connecting…",live:"Live",stale:"Stale feed",offline:"Offline",demo:"Demo data (no server)"}[kind]||"…";
+  const dot=document.getElementById('liveDot'), tx=document.getElementById('liveStatusText');
+  if(dot){ dot.style.background=c; dot.style.boxShadow="0 0 7px "+c; }
+  if(tx) tx.textContent=t;
+}
+
+function _tile(lab,id,unit,color){
+  const u = unit?`<span style="font-size:13px;opacity:.5;font-weight:400;margin-left:3px">${unit}</span>`:'';
+  const col = color?`color:${color}`:'';
+  return `<div style="border:1px solid rgba(127,127,127,.18);background:rgba(127,127,127,.06);border-radius:12px;padding:13px 15px">
+    <div style="font-size:12px;opacity:.6;margin-bottom:6px">${lab}</div>
+    <div style="font-size:34px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;${col}"><span id="${id}">—</span>${u}</div></div>`;
+}
+
+function renderLive(){
+  const m=document.getElementById('main');
+  if(!document.getElementById('liveWrap')){
+    m.innerHTML = `<div id="liveWrap">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin:8px 0 16px">
+        ${_tile('Line speed','lv_speed','/min')}
+        ${_tile('Total output','lv_total')}
+        ${_tile('Good','lv_good','','#16a34a')}
+        ${_tile('Empty','lv_empty','','#d97706')}
+        ${_tile('Defect','lv_defect','','#dc2626')}
+        ${_tile('Reject rate','lv_reject','%')}
+        <div style="border:1px solid rgba(127,127,127,.18);background:rgba(127,127,127,.06);border-radius:12px;padding:13px 15px;grid-column:span 2;min-width:0">
+          <div style="font-size:12px;opacity:.6;margin-bottom:6px">Recipe / SKU</div>
+          <div style="font-size:20px;font-weight:600;line-height:1.2;overflow-wrap:anywhere" id="lv_sku">—</div>
+          <div style="font-size:13px;opacity:.6;margin-top:8px" id="lv_state">—</div></div>
+      </div>
+      <div style="border:1px solid rgba(127,127,127,.18);border-radius:12px;padding:12px 14px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+          <span style="font-weight:600;font-size:14px">Live camera</span>
+          <span style="font-size:12px;opacity:.55">Weber Tracker</span>
+        </div>
+        <div style="position:relative;background:#0b0f17;border-radius:8px;overflow:hidden;min-height:200px;display:flex;align-items:center;justify-content:center">
+          <span style="position:absolute;font-size:13px;color:#9aa6bd">waiting for camera…</span>
+          <img id="lv_cam" alt="live camera" style="position:relative;max-width:100%;max-height:420px;display:block;border-radius:8px">
+        </div>
+      </div>
+      <div style="border:1px solid rgba(127,127,127,.18);border-radius:12px;padding:12px 14px 6px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <span style="font-weight:600;font-size:14px">Line speed — live</span>
+          <span style="font-size:12px;opacity:.55" id="lv_window"></span>
+        </div>
+        <canvas id="lv_chart" style="width:100%;height:240px;display:block"></canvas>
+      </div></div>`;
+    document.getElementById('lv_window').textContent='last '+Math.round(WINDOW_SAMPLES*POLL_MS/60000)+' min';
+  }
+  if(_lastLive) paintTiles(_lastLive);
+  drawLiveChart();
+  refreshCam();
+}
+
+function paintTiles(d){
+  if(!d) return;
+  const f=n=>(n==null||isNaN(n))?"—":Math.round(n).toLocaleString();
+  const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+  set('lv_speed',f(d.speed)); set('lv_total',f(d.total));
+  set('lv_good',f(d.good)); set('lv_empty',f(d.empty)); set('lv_defect',f(d.defect));
+  set('lv_reject',(d.total>0?((d.empty+d.defect)/d.total*100):0).toFixed(1));
+  set('lv_sku',d.sku||"—");
+  set('lv_state',(d.state in STATE_LABELS)?STATE_LABELS[d.state]:("state code "+d.state));
+}
+
+function _record(d){ _buf.push({t:Date.now(),speed:+d.speed||0}); if(_buf.length>WINDOW_SAMPLES) _buf.shift(); }
+
+function drawLiveChart(){
+  const cv=document.getElementById('lv_chart'); if(!cv) return;
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  cv.width=w*dpr; cv.height=h*dpr;
+  const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,w,h);
+  const ink=getComputedStyle(document.body).color||'#334155';
+  const padL=44,padR=12,padT=10,padB=20, x0=padL,x1=w-padR,y0=padT,y1=h-padB;
+  let maxV=60; for(const p of _buf) if(p.speed>maxV) maxV=p.speed; maxV=Math.ceil(maxV*1.15/20)*20;
+  ctx.font='11px system-ui,sans-serif'; ctx.textBaseline='middle';
+  for(let i=0;i<=4;i++){ const gy=y0+(y1-y0)*i/4, v=maxV*(1-i/4);
+    ctx.strokeStyle='rgba(127,127,127,.22)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x0,gy); ctx.lineTo(x1,gy); ctx.stroke();
+    ctx.fillStyle='rgba(127,127,127,.8)'; ctx.textAlign='start'; ctx.fillText(Math.round(v),8,gy); }
+  if(_buf.length<2){ ctx.fillStyle='rgba(127,127,127,.7)'; ctx.textAlign='center';
+    ctx.fillText('waiting for data…',(x0+x1)/2,(y0+y1)/2); return; }
+  const px=i=>x0+(x1-x0)*(i/(WINDOW_SAMPLES-1)), py=v=>y1-(y1-y0)*(v/maxV);
+  ctx.beginPath(); _buf.forEach((p,i)=>{const X=px(i),Y=py(p.speed); i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);});
+  ctx.strokeStyle='#3b82f6'; ctx.lineWidth=2; ctx.stroke();
+  const n=_buf.length;
+  ctx.lineTo(px(n-1),y1); ctx.lineTo(px(0),y1); ctx.closePath(); ctx.fillStyle='rgba(59,130,246,.10)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(px(n-1),py(_buf[n-1].speed),3.5,0,7); ctx.fillStyle='#3b82f6'; ctx.fill();
+  ctx.textAlign='end'; ctx.fillStyle=ink; ctx.font='13px system-ui,sans-serif';
+  ctx.fillText(Math.round(_buf[n-1].speed)+' /min',x1,y0+6);
+}
+
+function refreshCam(){
+  const img=document.getElementById('lv_cam'); if(!img||VIEW!=='live') return;
+  const probe=new Image();
+  probe.onload=()=>{ img.src=probe.src; };   // swap only after it loads (no flicker)
+  probe.src='/api/frame.jpg?t='+Date.now();
+}
+
+async function pollLive(){
+  try{
+    const r=await fetch('/api/live',{cache:'no-store'}); if(!r.ok) throw 0;
+    const d=await r.json(); _everLive=true; _demo=null; _lastLive=d; _record(d);
+    setLiveStatus((d.updated_age==null||d.updated_age>15)?'stale':'live');
+    if(VIEW==='live'){ if(!document.getElementById('liveWrap')) renderLive(); paintTiles(d); drawLiveChart(); }
+  }catch(e){
+    if(!_everLive){ tickDemo(); } else { setLiveStatus('offline'); }
+  }
+}
+function tickDemo(){
+  if(!_demo) _demo={good:0,empty:0,defect:0,sku:'331TX'};
+  _demo.good += 4+Math.floor(Math.random()*4);
+  if(Math.random()<0.15) _demo.empty++; if(Math.random()<0.10) _demo.defect++;
+  const total=_demo.good+_demo.empty+_demo.defect;
+  const d={sku:_demo.sku,speed:230+Math.round(Math.random()*40),total,
+           good:_demo.good,empty:_demo.empty,defect:_demo.defect,state:256,updated_age:0};
+  _lastLive=d; _record(d); setLiveStatus('demo');
+  if(VIEW==='live'){ paintTiles(d); drawLiveChart(); }
+}
+
+function applyRowsPreserveView(text){
+  const parsed=parseCSVText(text);
+  if(!parsed.length) return false;
+  parsed.sort((a,b)=>a.ts-b.ts);
+  ROWS=parsed; _WR=null;
+  if(!_histBootstrapped){ SEL=localDate(ROWS[ROWS.length-1].ts); _histBootstrapped=true; }
+  if(VIEW!=='live') render();
+  return true;
+}
+async function refreshRows(){
+  try{ const r=await fetch('/api/rows',{cache:'no-store'}); if(!r.ok) throw 0;
+       return applyRowsPreserveView(await r.text()); }
+  catch(e){ return false; }
+}
+async function bootstrapData(){
+  setLiveStatus('connecting');
+  try{ render(); }catch(e){ console.error('initial render failed', e); }
+  pollLive();                                   // first live read now
+  setInterval(pollLive, POLL_MS);
+  setInterval(()=>{ if(VIEW==='live') refreshCam(); }, 280);   // ~4 fps camera
+  await loadDays();   // learn which days exist (cheap) + default to the latest
+  // Auto-refresh only the latest day/week; older days are static.
+  setInterval(()=>{
+    const latest = DAYS_AVAIL[DAYS_AVAIL.length-1];
+    if(VIEW==='daily'  && SEL===latest) loadDay(SEL);
+    else if(VIEW==='weekly' && SEL===latest) loadWeek(SEL);
+  }, 30000);
+}
+
+// ── INIT ────────────────────────────────────────────────
+bootstrapData();
+window.addEventListener('resize',()=>{ if(VIEW==='live') drawLiveChart(); else render(); });
+</script>
+</body>
+</html>
