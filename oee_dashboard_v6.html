@@ -911,6 +911,13 @@ function toggleTheme(){
   render();
 }
 let DAYS_AVAIL = [];   // available date folders, from /api/days
+let _dataStale = false;  // true when a refresh failed and we're showing cached data
+
+function staleBanner(){
+  return _dataStale
+    ? '<div class="warn">⚠ Network lag — showing the last data loaded. It refreshes automatically when the connection recovers.</div>'
+    : '';
+}
 
 function clampDay(ds){
   const min=DAYS_AVAIL[0], max=DAYS_AVAIL[DAYS_AVAIL.length-1];
@@ -953,23 +960,34 @@ async function loadDays(){
   if(DAYS_AVAIL.length && !_histBootstrapped){ SEL=DAYS_AVAIL[DAYS_AVAIL.length-1]; _histBootstrapped=true; }
 }
 async function loadDay(date){
+  SEL=date;
   let text=null;
   try{ const r=await fetch('/api/rows?date='+date,{cache:'no-store'}); if(r.ok) text=await r.text(); }catch(e){}
-  const parsed = text!=null ? parseCSVText(text)
-                            : parseCSVText(FALLBACK).filter(r=>localDate(r.ts)===date);  // offline
-  parsed.sort((a,b)=>a.ts-b.ts);
-  ROWS=parsed; _WR=null; SEL=date;
-  renderDaily();
+  if(text!=null){
+    const parsed=parseCSVText(text); parsed.sort((a,b)=>a.ts-b.ts);
+    ROWS=parsed; _WR=null; _dataStale=false; renderDaily();
+  } else if(ROWS && ROWS.length){
+    _dataStale=true; renderDaily();                       // keep last data through the lag
+  } else {
+    const parsed=parseCSVText(FALLBACK).filter(r=>localDate(r.ts)===date);  // offline first load
+    parsed.sort((a,b)=>a.ts-b.ts); ROWS=parsed; _WR=null; _dataStale=true; renderDaily();
+  }
 }
 async function loadWeek(endDate){
+  SEL=endDate;
   const end=new Date(endDate+'T00:00:00'), start=new Date(end); start.setDate(end.getDate()-6);
   const frm=localDate(start), to=localDate(end);
   let text=null;
   try{ const r=await fetch(`/api/rows?from=${frm}&to=${to}`,{cache:'no-store'}); if(r.ok) text=await r.text(); }catch(e){}
-  const parsed = text!=null ? parseCSVText(text) : parseCSVText(FALLBACK);  // offline
-  parsed.sort((a,b)=>a.ts-b.ts);
-  ROWS=parsed; _WR=null; SEL=endDate;
-  renderWeekly();
+  if(text!=null){
+    const parsed=parseCSVText(text); parsed.sort((a,b)=>a.ts-b.ts);
+    ROWS=parsed; _WR=null; _dataStale=false; renderWeekly();
+  } else if(ROWS && ROWS.length){
+    _dataStale=true; renderWeekly();                      // keep last data through the lag
+  } else {
+    const parsed=parseCSVText(FALLBACK); parsed.sort((a,b)=>a.ts-b.ts);
+    ROWS=parsed; _WR=null; _dataStale=true; renderWeekly();
+  }
 }
 function render(){ if(VIEW==='live'){renderLive();return;} VIEW==='daily'?renderDaily():renderWeekly(); }
 
@@ -983,6 +1001,7 @@ function renderDaily(){
 
   document.getElementById('main').innerHTML=`
     ${dateSelector()}
+    ${staleBanner()}
     ${card(sh('SKU Timeline')+skuTable(runs))}
     ${card(sh('Machine Status — Gantt')+ganttBlock(dr,SEL)+
       `<div class="leg" style="margin-top:10px">
@@ -1041,6 +1060,7 @@ function renderWeekly(){
 
   document.getElementById('main').innerHTML=`
     ${weekSelector()}
+    ${staleBanner()}
     ${!isReal ? '<div class="warn">⚠️ Weekly view simulated from single-day data with ±8% variation.</div>' : ''}
     ${card(sh('SKU Summary by Day')+`<div class="scroll"><table>
       <thead><tr><th>Day</th><th>SKU</th><th>Good Bags</th><th>Empty</th><th>Defect</th><th>Run Time</th></tr></thead>
