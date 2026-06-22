@@ -1143,6 +1143,7 @@ async function loadDefects(date){
   try{
     const r=await fetch('/api/screenshots?date='+date,{cache:'no-store'});
     _shots = r.ok ? await r.json() : [];
+    _shots = _shots.filter(s => !s.misread);   // hide SKU-misread audit shots from Defects
     _dataStale=false;
   }catch(e){
     if(!_shots.length){ _shots=[]; }
@@ -1207,7 +1208,7 @@ function renderDefects(){
     ${dateSelector()}
     ${staleBanner()}
     ${card(sh('Quality Screenshots')+
-      `<div class="shot-filters">${fb('all','All')}${fb('empty','Empty')}${fb('defect','Defect')}${fb('misread','Misread')}</div>`+
+      `<div class="shot-filters">${fb('all','All')}${fb('empty','Empty')}${fb('defect','Defect')}</div>`+
       body)}
   `;
 }
