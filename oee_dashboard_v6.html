@@ -1243,7 +1243,15 @@ document.addEventListener('keydown',e=>{
 // ═══════════════════════════════════════════════════════
 const POLL_MS = 2000;          // live refresh rate
 const WINDOW_SAMPLES = 150;    // 150 × 2s = 5 min of trend
-const STATE_LABELS = { 0:"Stopped", 128:"Idle", 256:"Running" };  // edit to match Tag_86
+const STATE_LABELS = {
+  1:    "Operating",
+  16:   "Planned Stop",
+  128:  "Operating",
+  256:  "Minor Stop",
+  512:  "Changeover",
+  1024: "Breakdown",
+  2048: "Minor Stop"
+}; // edit to match Tag_86
 
 let _buf = [];                 // [{t, speed}]
 let _lastLive = null;
